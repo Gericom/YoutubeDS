@@ -77,3 +77,9 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+youtube/
+sbr/
+build/
+line.bat
+*.elf
