@@ -12,10 +12,10 @@
 #include "mpeg4.h"
 #include "util.h"
 #include "mpeg4_tables.h"
-#include "yuv2rgb.h" 
 #include "aac_pub/aacdec.h"
 #include "ringbufferhttpstream.h"
 #include "copy.h"
+#include "yuv2rgb_new.h"
 
 static char* mVideoId = "2JyUD79ky8s";//"2JyUD79ky8s";
 
@@ -70,7 +70,7 @@ static int mWaveDataOffs_write = 0;
 static bool hasAudioStarted = false;
 
 //FrameQueue implementation
-#define NR_FRAME_BLOCKS		(5)
+#define NR_FRAME_BLOCKS		(6)
 static volatile int curBlock = -1;
 static volatile int nrFramesInQueue = 0;
 static volatile int firstQueueBlock = 0;//block to read from (most of the time (curBlock + 1) % 4)
@@ -104,7 +104,7 @@ ITCM_CODE static void frameHandler()
 	//Solves non vsync (switch in middle of frame), but makes it much slower!
 	//while(!GX_IsVBlank());
 	BG_PALETTE_SUB[0] = RGB5(0,0,0);
-	REG_BG3CNT = ((6 * firstQueueBlock) << 8) | 0x4084;
+	REG_BG3CNT = ((5 * firstQueueBlock) << 8) | 0x4084;
 	curBlock = firstQueueBlock;
 	firstQueueBlock = (firstQueueBlock + 1) % NR_FRAME_BLOCKS;
 	nrFramesInQueue--;
@@ -360,7 +360,8 @@ int main()
 		}
 		else keytimer--;
 		while(nrFramesInQueue >= NR_FRAME_BLOCKS || lastQueueBlock == curBlock);
-		copy2vram(mpeg4DecStruct.pDstY, mpeg4DecStruct.pDstUV, (uint16_t*)(((uint32_t)BG_GFX) + 96 * 1024 * lastQueueBlock));
+		//copy2vram(mpeg4DecStruct.pDstY, mpeg4DecStruct.pDstUV, (uint16_t*)(((uint32_t)BG_GFX) + 96 * 1024 * lastQueueBlock));
+		yuv2rgb_new(mpeg4DecStruct.pDstY, mpeg4DecStruct.pDstUV, (uint16_t*)(((uint32_t)BG_GFX) + /*96*/80 * 1024 * lastQueueBlock));
 		lastQueueBlock = (lastQueueBlock + 1) % NR_FRAME_BLOCKS;
 		nrFramesInQueue++;
 		asm("mov r11, r11");
