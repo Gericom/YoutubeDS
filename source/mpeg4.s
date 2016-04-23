@@ -31,9 +31,9 @@ mpeg4_VideoObjectPlane_modulo_time_base_loop:
 		blmi mpeg4_BitReader_FillBits
 
 	adds r3, r3
+		bcc mpeg4_VideoObjectPlane_end	//vob is not coded
 	subs r2, #1
 		blmi mpeg4_BitReader_FillBits
-	bcc mpeg4_VideoObjectPlane_end	//vob is not coded
 
 	cmp r4, #1
 		addeq r3, r3	//vop_rounding_type, doesn't seem to be used yet
@@ -1895,7 +1895,6 @@ mpeg4_block_read_dct:
 		beq mpeg4_block_finish	//no ac coëfficients coded
 mpeg4_block_read_dct_init:
 	cmp r4, #0	//0 = inter mode, 1 = intra mode
-	mov r11, r11
 	ldr r5,= mpeg4_dezigzag_table
 	add r4, r5
 	ldreq r5, [r0, #mpeg4_dec_struct__pInterDCTVLCTable]

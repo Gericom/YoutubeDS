@@ -28,9 +28,8 @@ static uint8_t mAudioTmpBuffer[TMP_BUFFER_SIZE] __attribute__ ((aligned (32)));
 static mpeg4_dec_struct mpeg4DecStruct __attribute__ ((aligned (32)));
 
 static uint8_t mYBufferA[256 * 144] __attribute__ ((aligned (32)));
-static uint8_t mUVBufferA[256 * 72] __attribute__ ((aligned (32)));
-
 static uint8_t mYBufferB[256 * 144] __attribute__ ((aligned (32)));
+static uint8_t mUVBufferA[256 * 72] __attribute__ ((aligned (32)));
 static uint8_t mUVBufferB[256 * 72] __attribute__ ((aligned (32)));
 
 static int16_t mYDCCoefCache[256 / 8 * 144 / 8] __attribute__ ((aligned (32)));
@@ -112,25 +111,8 @@ ITCM_CODE static void frameHandler()
 
 #define USE_WIFI
 
-int main()
+void PlayVideo()
 {
-	defaultExceptionHandler();
-#ifdef USE_WIFI
-	consoleDemoInit();
-	if(!Wifi_InitDefault(WFC_CONNECT)) 
-	{
-		iprintf("Failed to connect!");
-	} 
-	iprintf("Connected\n\n");
-	swiWaitForVBlank();
-	swiWaitForVBlank();
-	char* url = YT_GetVideoInfo(mVideoId);
-	mRingBufferHttpStream = new RingBufferHttpStream(url);
-	free(url);
-#else
-	nitroFSInit(NULL);
-#endif
-	soundEnable();
 #ifdef USE_WIFI
 	//Skip ftyp box
 	uint32_t ftyp_size;
@@ -284,17 +266,29 @@ int main()
 		//MI_CpuFillFast(&mUVDCCoefCache[0], (1024 << 16) | 1024, sizeof(mUVDCCoefCache));
 		//MI_CpuFillFast(&mMVecCache[0], 0, sizeof(mMVecCache));
 		//So we're forced to use this instead
-		dmaFillWords((1024 << 16) | 1024, &mYDCCoefCache[0], sizeof(mYDCCoefCache));
-		dmaFillWords((1024 << 16) | 1024, &mUVDCCoefCache[0], sizeof(mUVDCCoefCache));
-		memset(&mMVecCache[0], 0, sizeof(mMVecCache));
-		DC_InvalidateRange(&mYDCCoefCache[0], sizeof(mYDCCoefCache));
-		DC_InvalidateRange(&mUVDCCoefCache[0], sizeof(mUVDCCoefCache));
+		//dmaFillWords((1024 << 16) | 1024, &mYDCCoefCache[0], sizeof(mYDCCoefCache));
+		for(int q = 0; q < sizeof(mYDCCoefCache) / sizeof(mYDCCoefCache[0]); q++)
+		{
+			mYDCCoefCache[q] = 1024;
+		}
+		for(int q = 0; q < sizeof(mUVDCCoefCache) / sizeof(mUVDCCoefCache[0]); q++)
+		{
+			mUVDCCoefCache[q] = 1024;
+		}
+		for(int q = 0; q < sizeof(mMVecCache) / sizeof(mMVecCache[0]); q++)
+		{
+			mMVecCache[q] = 0;
+		}
+		//dmaFillWords((1024 << 16) | 1024, &mUVDCCoefCache[0], sizeof(mUVDCCoefCache));
+		//memset(&mMVecCache[0], 0, sizeof(mMVecCache));
+		//DC_InvalidateRange(&mYDCCoefCache[0], sizeof(mYDCCoefCache));
+		//DC_InvalidateRange(&mUVDCCoefCache[0], sizeof(mUVDCCoefCache));
 		if(mpeg4DecStruct.pData[2] == 1 && mpeg4DecStruct.pData[3] == 0xB3)
 			mpeg4DecStruct.pData += 7;
 		mpeg4DecStruct.pData += 4;//skip 000001B6
-		int save = enterCriticalSection();
+		//int save = enterCriticalSection();
 		mpeg4_VideoObjectPlane(&mpeg4DecStruct);
-		leaveCriticalSection(save);
+		//leaveCriticalSection(save);
 		frame++;
 		if(offset == nextAudioBlockOffset)
 		{
@@ -320,6 +314,7 @@ int main()
 				{
 					break;
 				}
+				DC_FlushRange(&mWaveData[mWaveDataOffs_write * AUDIO_BLOCK_SIZE], AUDIO_BLOCK_SIZE * 2);
 				mWaveDataOffs_write = (mWaveDataOffs_write + 1) % NR_WAVE_DATA_BUFFERS;
 			}
 			if(!hasAudioStarted)
@@ -366,6 +361,30 @@ int main()
 		nrFramesInQueue++;
 		asm("mov r11, r11");
 	}
+}
+
+int main()
+{
+	defaultExceptionHandler();
+#ifdef USE_WIFI
+	consoleDemoInit();
+	if(!Wifi_InitDefault(WFC_CONNECT)) 
+	{
+		iprintf("Failed to connect!");
+	} 
+	iprintf("Connected\n\n");
+	swiWaitForVBlank();
+	swiWaitForVBlank();
+	//YT_SearchListResponse* response = YT_Search("grand dad", NULL);
+	char* url = YT_GetVideoInfo(mVideoId);//(&response->searchResults[0])->videoId);//mVideoId);
+	//YT_FreeSearchListResponse(response);
+	mRingBufferHttpStream = new RingBufferHttpStream(url);
+	free(url);
+#else
+	nitroFSInit(NULL);
+#endif
+	soundEnable();
+	PlayVideo();
 	
 	while(1)
 	{

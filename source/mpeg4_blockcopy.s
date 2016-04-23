@@ -1,12 +1,6 @@
 .section .itcm
 .include "mpeg4_header.s"
 
-//These functions copy blocks of 16x16 or 8x8
-//This needs to be improved to use 32 bit copy when possible
-//Currently byte copies are used because of alignment problems
-@@TODO: Half pixels are not supported yet!
-
-
 //r11 = dx, r12 = dy
 //This function is only used for Y, so we don't need to pass a source or destination
 .global mpeg4_blockcopy_16x16
@@ -177,7 +171,7 @@ mpeg4_blockcopy_8x8_simple:
 	bic r4, r12, #1
 	add r1, r4, lsl #(STRIDE_SHIFT - 1)
 	add r2, r8
-	mov r3, #16
+	mov r3, #8
 	and r4, r11, #1
 	orr r4, r12, lsl #1
 	and r4, #3

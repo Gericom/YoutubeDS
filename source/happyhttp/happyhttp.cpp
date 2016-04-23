@@ -357,7 +357,7 @@ void Connection::putrequest( const char* method, const char* url )
 	m_State = REQ_STARTED;
 
 	//char req[ 512 ];
-	char req[1024];
+	char req[2048];//1024];
 	sprintf( req, "%s %s HTTP/1.1", method, url );
 	m_Buffer.push_back( req );
 

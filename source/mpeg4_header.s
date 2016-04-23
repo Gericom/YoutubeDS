@@ -18,7 +18,7 @@ STRIDE_SHIFT = 8
 @uint8_t vop_time_increment_bits
 @uint8_t vop_fcode_forward
 
-mpeg4_dec_struct__pData = 0x0
+mpeg4_dec_struct__pData = 0
 mpeg4_dec_struct__width = (mpeg4_dec_struct__pData + 4)
 mpeg4_dec_struct__height = (mpeg4_dec_struct__width + 2)
 mpeg4_dec_struct__pDstY = (mpeg4_dec_struct__height + 2)

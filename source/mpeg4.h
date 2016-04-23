@@ -1,7 +1,7 @@
 #ifndef __MPEG4_H__
 #define __MPEG4_H__
 
-typedef struct
+typedef struct PACKED
 {
 	uint8_t* pData;
 	uint16_t width;
