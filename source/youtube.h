@@ -1,7 +1,7 @@
 #ifndef __YOUTUBE_H__
 #define __YOUTUBE_H__
 
-char* YT_GetVideoInfo(char* id);
+char* YT_GetVideoInfo(const char* id);
 
 typedef struct
 {
@@ -22,7 +22,9 @@ typedef struct
 	YT_SearchResult* searchResults;
 } YT_SearchListResponse;
 
-YT_SearchListResponse* YT_Search(char* query, char* pageToken);
+char* YT_Search_GetURL(char* query, int resultsPerPage, char* pageToken);
+YT_SearchListResponse* YT_Search_ParseResponse(char* response);
+//YT_SearchListResponse* YT_Search(char* query, char* pageToken);
 void YT_FreeSearchListResponse(YT_SearchListResponse* response);
 
 #endif

@@ -16,6 +16,12 @@ private:
 public:
 	RingBufferHttpStream(char* url);
 
+	~RingBufferHttpStream()
+	{
+		free(mRingBuffer);
+		delete mConnection;
+	}
+
 	void Read(uint8_t* dst, int count);
 
 	int GetStreamPosition() { return mStreamPosition; }

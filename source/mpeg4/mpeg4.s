@@ -1797,6 +1797,7 @@ mpeg4_dct_tmp:
 	.rept 64
 		.word 0
 	.endr
+mpeg4_dct_tmp_end:
 
 .align 4
 

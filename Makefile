@@ -17,11 +17,13 @@ include $(DEVKITARM)/ds_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(shell basename $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/aac source/aac/asm/armgcc source/happyhttp
+SOURCES		:=	source source/aac source/aac/asm/armgcc source/happyhttp source/gui source/mpeg4
 DATA		:=	data  
-INCLUDES	:=	include source source/aac source/aac_pub source/happyhttp source/rapidjson source/jpeg
+INCLUDES	:=	include source source/aac source/aac_pub source/happyhttp source/rapidjson source/jpeg source/gui source/mpeg4
 NITRODATA	:=	files
-GAME_TITLE := Youtube DS
+GAME_TITLE := YouTube DS
+GAME_SUBTITLE1 := Watch video's on your DS!
+GAME_SUBTITLE2 := By Gericom
 GAME_ICON := $(CURDIR)/../icon.bmp
 
 #---------------------------------------------------------------------------------

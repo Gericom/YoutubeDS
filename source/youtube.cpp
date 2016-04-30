@@ -10,6 +10,7 @@
 #include "happyhttp/happyhttp.h"
 #include "youtube_apikey.h"
 #include "rapidjson/document.h"
+#include "util.h"
 
 using namespace rapidjson;
 
@@ -60,9 +61,29 @@ void OnData( const happyhttp::Response* r, void* userdata, const unsigned char* 
 	count += n;
 }
 
-// invoked when response is complete
-void OnComplete( const happyhttp::Response* r, void* userdata )
+char* YT_GetVideoInfo(const char* id)
 {
+	int tries = 10;
+retry:
+	int length = strlen(id) + strlen(YT_VideoInfoURL);
+	char* resultUrl = (char*)malloc(length + 1);
+	memset(resultUrl, 0, length + 1);
+	strcpy(resultUrl, YT_VideoInfoURL);
+	strcat(resultUrl, id);
+	iprintf(resultUrl);
+	happyhttp::Connection* mConnection = new happyhttp::Connection("www.youtube.com", 80);
+	response = (uint8_t*)malloc(96 * 1024);
+	pResponse = response;
+	count = 0;
+	videourl = NULL;
+	mConnection->setcallbacks( NULL, OnData, NULL, 0 );
+	mConnection->request( "GET", resultUrl);
+	free(resultUrl);
+	videourl = NULL;
+	while(mConnection->outstanding())
+		mConnection->pump();
+	mConnection->close();
+	delete mConnection;
 	char tmpbuf[26 + 1];
 	memset(&tmpbuf[0], 0, sizeof(tmpbuf));
 	pResponse = response;
@@ -73,7 +94,7 @@ void OnComplete( const happyhttp::Response* r, void* userdata )
 		//find =
 		tagstart = (char*)pResponse;
 		taglen = 0;
-		while(*((char*)pResponse) != '=')
+		while(pResponse < response + count && *((char*)pResponse) != '=')
 		{
 			taglen++;
 			pResponse++;
@@ -82,8 +103,6 @@ void OnComplete( const happyhttp::Response* r, void* userdata )
 		{
 			memset(&tmpbuf[0], 0, sizeof(tmpbuf));
 			memcpy(tmpbuf, tagstart, taglen);
-			//printf(tmpbuf);
-			//printf("\n");
 			if(!strcmp(tmpbuf, "url_encoded_fmt_stream_map"))
 			{
 				//Let's find the content
@@ -95,7 +114,7 @@ void OnComplete( const happyhttp::Response* r, void* userdata )
 					pResponse++;
 					contentlen++;
 				}
-				printf("Len: %d\n", contentlen);
+				//printf("Len: %d\n", contentlen);
 				char* src = (char*)malloc(contentlen + 1);
 				memset(src, 0, contentlen + 1);
 				memcpy(src, contentstart, contentlen);
@@ -125,11 +144,12 @@ void OnComplete( const happyhttp::Response* r, void* userdata )
 					pSrc++;
 					char* valuestart2 = pSrc;
 					int valuelen = 0;
-					while(pSrc < src + totallength && *((char*)pSrc) != '&')
+					while(pSrc < src + totallength && *((char*)pSrc) != '&' && *((char*)pResponse) != ',')
 					{
 						valuelen++;
 						pSrc++;
 					}
+					char lastsymbol = *((char*)pResponse);
 					pSrc++;
 					int mask = 0;
 					if(taglength2 == 13)
@@ -141,9 +161,9 @@ void OnComplete( const happyhttp::Response* r, void* userdata )
 					else if(taglength2 == 4 && tagstart2[0] == 't')
 						mask |= 8;
 
-					if(partmask & mask)
+					if(partmask & mask || lastsymbol == ',')
 					{
-						printf("partmask full\n");
+						//printf("partmask full\n");
 						if(itag == 17)
 						{
 							goto itag_17;
@@ -163,7 +183,7 @@ void OnComplete( const happyhttp::Response* r, void* userdata )
 						if(valuelen > 2) valuelen = 2;
 						memcpy(&tmpbuf[0], valuestart2, valuelen);
 						itag = atoi(&tmpbuf[0]);
-						printf("itag: %d\n", itag);
+						//printf("itag: %d\n", itag);
 					}
 					else if(taglength2 == 3)
 					{
@@ -174,56 +194,49 @@ void OnComplete( const happyhttp::Response* r, void* userdata )
 					else if(taglength2 == 4 && tagstart2[0] == 't')
 						partmask |= 8;
 
-					printf("taglen: %d\n", taglength2);
+					//printf("taglen: %d\n", taglength2);
 				}
 				if(itag == 17)
 				{
 				itag_17:
-					printf("itag == 17\n");
+					if(!pURL)
+					{
+						free(src);
+						tries--;
+						if(tries == 0) return NULL;
+						goto retry;
+					}
+					//printf("itag == 17\n");
 					char* url = (char*)malloc(urlLength + 1);
 					memset(url, 0, urlLength + 1);
 					memcpy(url, pURL, urlLength);
 					free(src);
 					urldecode2(url, url);
-					puts(url);
+					//puts(url);
 					videourl = url;
-					return;
+					goto finish;
 				}
-				printf("FAIL!\n");
-				while(1);
+				free(src);
+				tries--;
+				if(tries == 0) return NULL;
+				goto retry;
+				//printf("FAIL!\n");
+				//while(1);
 			}
 		}
-		while(*((char*)pResponse) != '&')
+		while(pResponse < response + count && *((char*)pResponse) != '&')
 		{
 			pResponse++;
 		}
 		pResponse++;
 	}
-	printf("FAIL!\n");
-	while(1);
-}
-
-char* YT_GetVideoInfo(char* id)
-{
-	int length = strlen(id) + strlen(YT_VideoInfoURL);
-	char* resultUrl = (char*)malloc(length + 1);
-	memset(resultUrl, 0, length + 1);
-	strcpy(resultUrl, YT_VideoInfoURL);
-	strcat(resultUrl, id);
-	iprintf(resultUrl);
-	happyhttp::Connection* mConnection = new happyhttp::Connection( "www.youtube.com", 80 );
-	response = (uint8_t*)malloc(64 * 1024);
-	pResponse = response;
-	count = 0;
-	videourl = NULL;
-	mConnection->setcallbacks( NULL, OnData, OnComplete, 0 );
-	mConnection->request( "GET", resultUrl);
-	free(resultUrl);
-	videourl = NULL;
-	while( mConnection->outstanding() && videourl == NULL )
-		mConnection->pump();
-	mConnection->close();
-	delete mConnection;
+	free(response);
+	tries--;
+	if(tries == 0) return NULL;
+	goto retry;
+	//printf("FAIL!\n");
+	//while(1);
+finish:
 	return (char*)videourl;
 }
 
@@ -249,18 +262,8 @@ static char *url_encode(char *str) {
   return buf;
 }
 
-static char* copyString(const char* string)
+char* YT_Search_GetURL(char* query, int resultsPerPage, char* pageToken)
 {
-	int len = strlen(string);
-	char* result = (char*)malloc(len + 1);
-	memcpy(result, string, len + 1);
-	return result;
-}
-
-//Search and parsing of results
-YT_SearchListResponse* YT_Search(char* query, char* pageToken)
-{
-	happyhttp::Connection* mConnection = new happyhttp::Connection("florian.nouwt.com", 80);
 	int qlen = strlen(query);
 	char* query2 = (char*)malloc(qlen + 1);
 	for(int i = 0; i < qlen; i++)
@@ -274,14 +277,49 @@ YT_SearchListResponse* YT_Search(char* query, char* pageToken)
 	free(query2);
 	char* url = NULL;
 	if(pageToken == NULL)
-		asprintf(&url, "https://www.googleapis.com/youtube/v3/search?part=snippet&q=%s&type=video&key=%s", query3, youtube_apikey);
+		asprintf(&url, "https://www.googleapis.com/youtube/v3/search?part=snippet&q=%s&type=video&maxResults=%d&key=%s", query3, resultsPerPage, youtube_apikey);
 	else 
-		asprintf(&url, "https://www.googleapis.com/youtube/v3/search?part=snippet&q=%s&type=video&pageToken=%s&key=%s", query3, pageToken, youtube_apikey);
+		asprintf(&url, "https://www.googleapis.com/youtube/v3/search?part=snippet&q=%s&type=video&maxResults=%d&pageToken=%s&key=%s", query3, resultsPerPage, pageToken, youtube_apikey);
 	char* url2 = url_encode(url);
 	free(url);
 	char* url3 = NULL;
 	asprintf(&url3, "/ythttps.php?u=%s", url2);
 	free(url2);
+	return url3;
+}
+
+YT_SearchListResponse* YT_Search_ParseResponse(char* response)
+{
+	Document document;
+	document.ParseInsitu(response);
+	YT_SearchListResponse* result = (YT_SearchListResponse*)malloc(sizeof(YT_SearchListResponse));
+	memset(result, 0, sizeof(YT_SearchListResponse));
+	if(document.HasMember("prevPageToken"))
+		result->prevPageToken = Util_CopyString(document["prevPageToken"].GetString());
+	if(document.HasMember("nextPageToken"))
+		result->nextPageToken = Util_CopyString(document["nextPageToken"].GetString());
+	result->totalNrResults = document["pageInfo"]["totalResults"].GetInt();
+	result->nrResultsPerPage = document["pageInfo"]["resultsPerPage"].GetInt();
+	result->searchResults = (YT_SearchResult*)malloc(result->nrResultsPerPage * sizeof(YT_SearchResult));
+	memset(result->searchResults, 0, result->nrResultsPerPage * sizeof(YT_SearchResult));
+	for(int i = 0; i < result->nrResultsPerPage; i++)
+	{
+		YT_SearchResult* cur = &result->searchResults[i];
+		cur->videoId = Util_CopyString(document["items"][i]["id"]["videoId"].GetString());
+		cur->title = Util_CopyString(document["items"][i]["snippet"]["title"].GetString());
+		cur->description = Util_CopyString(document["items"][i]["snippet"]["description"].GetString());
+		cur->thumbnail = Util_CopyString(document["items"][i]["snippet"]["thumbnails"]["default"]["url"].GetString());
+		cur->channelId = Util_CopyString(document["items"][i]["snippet"]["channelId"].GetString());
+		cur->channelTitle = Util_CopyString(document["items"][i]["snippet"]["channelTitle"].GetString());
+	}
+	return result;
+}
+
+//Search and parsing of results
+/*YT_SearchListResponse* YT_Search(char* query, int resultsPerPage, char* pageToken)
+{
+	happyhttp::Connection* mConnection = new happyhttp::Connection("florian.nouwt.com", 80);
+	char* url3 = YT_Search_GetURL(query, resultsPerPage, pageToken);
 	response = (uint8_t*)malloc(64 * 1024);
 	pResponse = response;
 	count = 0;
@@ -293,31 +331,10 @@ YT_SearchListResponse* YT_Search(char* query, char* pageToken)
 	mConnection->close();
 	delete mConnection;
 	pResponse[0] = 0;
-	Document document;
-	document.ParseInsitu((char*)response);
-	YT_SearchListResponse* result = (YT_SearchListResponse*)malloc(sizeof(YT_SearchListResponse));
-	memset(result, 0, sizeof(YT_SearchListResponse));
-	if(document.HasMember("prevPageToken"))
-		result->prevPageToken = copyString(document["prevPageToken"].GetString());
-	if(document.HasMember("nextPageToken"))
-		result->prevPageToken = copyString(document["nextPageToken"].GetString());
-	result->totalNrResults = document["pageInfo"]["totalResults"].GetInt();
-	result->nrResultsPerPage = document["pageInfo"]["resultsPerPage"].GetInt();
-	result->searchResults = (YT_SearchResult*)malloc(result->nrResultsPerPage * sizeof(YT_SearchResult));
-	memset(result->searchResults, 0, result->nrResultsPerPage * sizeof(YT_SearchResult));
-	for(int i = 0; i < result->nrResultsPerPage; i++)
-	{
-		YT_SearchResult* cur = &result->searchResults[i];
-		cur->videoId = copyString(document["items"][i]["id"]["videoId"].GetString());
-		cur->title = copyString(document["items"][i]["snippet"]["title"].GetString());
-		cur->description = copyString(document["items"][i]["snippet"]["description"].GetString());
-		cur->thumbnail = copyString(document["items"][i]["snippet"]["thumbnails"]["default"]["url"].GetString());
-		cur->channelId = copyString(document["items"][i]["snippet"]["channelId"].GetString());
-		cur->channelTitle = copyString(document["items"][i]["snippet"]["channelTitle"].GetString());
-	}
+	YT_SearchListResponse* result = YT_Search_ParseResponse((char*)response);
 	free(response);
 	return result;
-}
+}*/
 
 void YT_FreeSearchListResponse(YT_SearchListResponse* response)
 {
