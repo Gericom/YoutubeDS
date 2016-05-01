@@ -23,8 +23,9 @@
 #include "gui/ListSlice.h"
 #include "gui/PagingListSliceAdapter.h"
 #include "gui/ProgressBar.h"
+#include "print.h"
 
-#define TMP_BUFFER_SIZE		(192 * 256 * 2)
+#define TMP_BUFFER_SIZE		(32 * 1024)
 
 static uint8_t mVideoTmpBuffer[TMP_BUFFER_SIZE] __attribute__ ((aligned (32)));
 
@@ -44,11 +45,11 @@ static int16_t mMVecCache[(256 / 8 * 144 / 8) * 2] __attribute__ ((aligned (32))
 
 static uint8_t* mVideoHeader;
 
-static volatile bool mUpscalingEnabled = false;
+static volatile int mUpscalingEnabled = false;
 
 #define AUDIO_BLOCK_SIZE	(1024)
 
-#define NR_WAVE_DATA_BUFFERS	(96)//(32)
+#define NR_WAVE_DATA_BUFFERS	(256)//(32)
 
 #define WAVE_DATA_BUFFER_LENGTH		(AUDIO_BLOCK_SIZE * NR_WAVE_DATA_BUFFERS)
 
@@ -59,7 +60,7 @@ static int mWaveDataOffs_write = 0;
 static bool hasAudioStarted = false;
 
 //FrameQueue implementation
-#define NR_FRAME_BLOCKS		(9)//(10)//(6)
+#define NR_FRAME_BLOCKS		(10)//(9)//(10)//(6)
 static volatile int curBlock = -1;
 static volatile int nrFramesInQueue = 0;
 static volatile int firstQueueBlock = 0;//block to read from (most of the time (curBlock + 1) % 4)
@@ -378,100 +379,14 @@ static ScreenKeyboard* mKeyboard;
 static TestAdapter* mTestAdapter;
 static ListSlice* mList;
 
-/*static void ResyncAudio()
-{
-	if(hasAudioStarted)
-	{
-		soundKill(soundIdL);
-		soundKill(soundIdR);
-		mWaveDataOffs_write = 0;
-		hasAudioStarted = false;
-	}
-}*/
+#define FRAME_SIZE	(176 * 144)
+static uint16_t mFrameQueue[FRAME_SIZE * NR_FRAME_BLOCKS] __attribute__ ((aligned (32)));
 
-//VRAM Mapping:
-//0x06000000 - E - 1 frame
-//0x06020000 - ABC - 8 frames
-
-static const int frameOffsets[] =
-{
-	0x06000000,
-	//0x06000000 + 48 * 1024,
-	0x06020000,
-	0x06020000 + 48 * 1024,
-	0x06020000 + 2 * 48 * 1024,
-	0x06020000 + 3 * 48 * 1024,
-	0x06020000 + 4 * 48 * 1024,
-	0x06020000 + 5 * 48 * 1024,
-	0x06020000 + 6 * 48 * 1024,
-	0x06020000 + 7 * 48 * 1024
-	//0x06000000,
-	//0x06020000,
-	//0x06020000 + 72 * 1024,
-	//0x06020000 + 2 * 72 * 1024,
-	//0x06020000 + 3 * 72 * 1024,
-	//0x06020000 + 4 * 72 * 1024
-};
-
-//some of these will be rounded down to a whole number
-static const int frameOffsetBaseBlockIdx[] =
-{
-	(frameOffsets[0] - 0x06000000) >> 14,
-	(frameOffsets[1] - 0x06000000) >> 14,
-	(frameOffsets[2] - 0x06000000) >> 14,
-	(frameOffsets[3] - 0x06000000) >> 14,
-	(frameOffsets[4] - 0x06000000) >> 14,
-	(frameOffsets[5] - 0x06000000) >> 14,
-	(frameOffsets[6] - 0x06000000) >> 14,
-	(frameOffsets[7] - 0x06000000) >> 14,
-	(frameOffsets[8] - 0x06000000) >> 14
-	//(frameOffsets[9] - 0x06000000) >> 14
-};
-
-//which will be corrected using this:
-/*static const int frameOffsetScrollFix[] =
-{
-	(frameOffsets[0] - (frameOffsetBaseBlockIdx[0] << 14) - 0x06000000) >> 9, 
-	(frameOffsets[1] - (frameOffsetBaseBlockIdx[1] << 14) - 0x06000000) >> 9, 
-	(frameOffsets[2] - (frameOffsetBaseBlockIdx[2] << 14) - 0x06000000) >> 9, 
-	(frameOffsets[3] - (frameOffsetBaseBlockIdx[3] << 14) - 0x06000000) >> 9, 
-	(frameOffsets[4] - (frameOffsetBaseBlockIdx[4] << 14) - 0x06000000) >> 9, 
-	(frameOffsets[5] - (frameOffsetBaseBlockIdx[5] << 14) - 0x06000000) >> 9
-};*/
+static volatile int mShouldCopyFrame;
 
 ITCM_CODE static void frameHandler()
 {
-	if(nrFramesInQueue <= 0)
-	{
-		//BG_PALETTE_SUB[0] = RGB5(31,0,0);
-		//nrFramesMissed++;
-		return;//We can't do anything without data
-	}
-	//Solves non vsync (switch in middle of frame), but makes it much slower!
-	//while(!GX_IsVBlank());
-	//BG_PALETTE_SUB[0] = RGB5(0,0,0);
-	/*uint32_t val = (frameOffsetBaseBlockIdx[firstQueueBlock] << 8) | 0x4084;
-	//uint32_t dispcnt = REG_DISPCNT & ~(DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
-	if(frameOffsetScrollFix[firstQueueBlock])
-	{
-		//dispcnt |= DISPLAY_BG2_ACTIVE;
-		REG_BG2CNT = val;
-		REG_BG3CNT = 1;
-		//REG_DISPCNT = dispcnt;
-	}
-	else
-	{
-		//dispcnt |= DISPLAY_BG3_ACTIVE;
-		REG_BG2CNT = 1;
-		REG_BG3CNT = val;
-		//REG_DISPCNT = dispcnt;
-	}*/
-	uint32_t val = (frameOffsetBaseBlockIdx[firstQueueBlock] << 8) | 0x4084;
-	REG_BG2CNT = val;
-	REG_BG3CNT = val;
-	curBlock = firstQueueBlock;
-	firstQueueBlock = (firstQueueBlock + 1) % NR_FRAME_BLOCKS;
-	nrFramesInQueue--;
+	mShouldCopyFrame = TRUE;
 }
 
 static BG23AffineInfo mLineAffineInfoOriginal[192] __attribute__ ((aligned (32)));
@@ -488,6 +403,7 @@ void PlayVideo()
 	lastQueueBlock = 0;
 	mWaveDataOffs_write = 0;
 	hasAudioStarted = false;
+	mShouldCopyFrame = FALSE;
 #ifdef USE_WIFI
 	char* url = YT_GetVideoInfo(mStartVideoId);
 	//mStartVideoId is always copied using Util_CopyString, so free it again
@@ -590,28 +506,21 @@ void PlayVideo()
 	memset(&mMVecCache[0], 0, sizeof(mMVecCache));
 	videoSetMode(MODE_5_2D);
 	vramSetBankE(VRAM_E_MAIN_BG);
-	vramSetBankA(VRAM_A_MAIN_BG_0x06020000);
-	vramSetBankB(VRAM_B_MAIN_BG_0x06040000);
-	vramSetBankC(VRAM_C_MAIN_BG_0x06060000);
 	dmaFillWords(0, (void*)0x06000000, 64 * 1024);
-	dmaFillWords(0, (void*)0x06020000, 3 * 128 * 1024);
 	bgInit(2, BgType_Bmp8, BgSize_B16_256x256, 0,0);
-	//bgSet(bg2, 0, 256, 256, -40 * 256, -24 * 256 + 16 * 256, 0, 0);
 	bgInit(3, BgType_Bmp8, BgSize_B16_256x256, 0,0);
-	//bgSet(bg3, 0, 256, 256, -40 * 256, -24 * 256, 0, 0);
 	REG_DISPCNT &= ~(DISPLAY_BG0_ACTIVE | DISPLAY_BG1_ACTIVE | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
 	if(!mUpscalingEnabled)
 	{
 		WIN0_X0 = 40;
 		WIN0_X1 = 40 + 176;
 		WIN0_Y0 = 24;
-		WIN0_Y1 = 24 + 138;//144;
+		WIN0_Y1 = 24 + 144;
 		WIN_IN = (1 << 3) | (1 << 2);
 		REG_DISPCNT |= DISPLAY_WIN0_ON | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE;
 	}
 	else
 		REG_DISPCNT |= DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE;
-	//bgUpdate();
 
 	HAACDecoder aacDec = AACInitDecoder();
 	AACFrameInfo frameInfo;
@@ -630,6 +539,10 @@ void PlayVideo()
 	int frame = 0;
 	if(timescale == 12)
 		timerStart(0, ClockDivider_1024, TIMER_FREQ_1024(12), frameHandler);
+	else if(timescale == 8333)
+		timerStart(0, ClockDivider_1024, /*TIMER_FREQ_1024(8)*/-3928, frameHandler);
+	else if(timescale == 6)
+		timerStart(0, ClockDivider_1024, TIMER_FREQ_1024(6), frameHandler);
 	else 
 		timerStart(0, ClockDivider_1024, TIMER_FREQ_1024(10), frameHandler);
 	int keytimer = 0;
@@ -673,7 +586,13 @@ void PlayVideo()
 		if(mpeg4DecStruct.pData[2] == 1 && mpeg4DecStruct.pData[3] == 0xB3)
 			mpeg4DecStruct.pData += 7;
 		mpeg4DecStruct.pData += 4;//skip 000001B6
+		//cpuStartTiming(2);
 		mpeg4_VideoObjectPlane(&mpeg4DecStruct);
+		//uint32_t time = cpuEndTiming();
+		//char tmp[21];
+		//memset(tmp, 0, sizeof(tmp));
+		//sprintf(tmp,"0x%x",time);
+		//mToolbar->SetTitle(tmp);
 		frame++;
 		if(offset == nextAudioBlockOffset)
 		{
@@ -710,7 +629,16 @@ void PlayVideo()
 		//{
 		//	if(stopVideo) goto video_stop;
 		//}
-		yuv2rgb_new(mpeg4DecStruct.pDstY, mpeg4DecStruct.pDstUV, (uint16_t*)frameOffsets[lastQueueBlock]);
+		//cpuStartTiming(2);
+		yuv2rgb_new(mpeg4DecStruct.pDstY, mpeg4DecStruct.pDstUV, &mFrameQueue[lastQueueBlock * FRAME_SIZE]);//(uint16_t*)frameOffsets[lastQueueBlock]);
+		DC_FlushRange(&mFrameQueue[lastQueueBlock * FRAME_SIZE], FRAME_SIZE * 2);
+		//uint32_t time = cpuEndTiming();
+		//char tmp[21];
+		//memset(tmp, 0, sizeof(tmp));
+		//sprintf(tmp,"0x%x",time);
+		//mToolbar->SetTitle(tmp);
+		//nocashPrint1("Time: %r0%\n", time);
+
 		lastQueueBlock = (lastQueueBlock + 1) % NR_FRAME_BLOCKS;
 		nrFramesInQueue++;
 		//asm("mov r11, r11");
@@ -799,9 +727,20 @@ void VBlankProc()
 {
 	scanKeys();
 	int held = keysHeld();
-	if(isVideoPlaying)//stride dma
+	if(isVideoPlaying)//stride dma and frame copy
 	{
 		DMA0_CR = 0;
+		if(mShouldCopyFrame)
+		{
+			mShouldCopyFrame = FALSE;
+			if(nrFramesInQueue > 0)
+			{
+				dmaCopyWordsAsynch(2, &mFrameQueue[firstQueueBlock * FRAME_SIZE], (void*)&BG_GFX[0], FRAME_SIZE * 2);//REG_BG2PA, sizeof(BG23AffineInfo));
+				curBlock = firstQueueBlock;
+				firstQueueBlock = (firstQueueBlock + 1) % NR_FRAME_BLOCKS;
+				nrFramesInQueue--;
+			}
+		}
 		if(!mKeyTimer)
 		{
 			if(held & KEY_SELECT)//toggle upscaling
@@ -812,7 +751,7 @@ void VBlankProc()
 					WIN0_X0 = 40;
 					WIN0_X1 = 40 + 176;
 					WIN0_Y0 = 24;
-					WIN0_Y1 = 24 + 138;//144;
+					WIN0_Y1 = 24 + 144;
 					WIN_IN = (1 << 3) | (1 << 2);
 					REG_DISPCNT |= DISPLAY_WIN0_ON;
 				}
@@ -824,17 +763,41 @@ void VBlankProc()
 		else mKeyTimer--;
 		if(mUpscalingEnabled)
 		{
-			dmaCopyWordsAsynch(3, &mLineAffineInfoUpscaled[0], (void*)&REG_BG2PA, sizeof(BG23AffineInfo));
+			REG_BG2PA = mLineAffineInfoUpscaled[0].BG2PA;
+			REG_BG2PB = mLineAffineInfoUpscaled[0].BG2PB;
+			REG_BG2PC = mLineAffineInfoUpscaled[0].BG2PC;
+			REG_BG2PD = mLineAffineInfoUpscaled[0].BG2PD;
+			REG_BG2X = mLineAffineInfoUpscaled[0].BG2X;
+			REG_BG2Y = mLineAffineInfoUpscaled[0].BG2Y;
+			REG_BG3PA = mLineAffineInfoUpscaled[0].BG3PA;
+			REG_BG3PB = mLineAffineInfoUpscaled[0].BG3PB;
+			REG_BG3PC = mLineAffineInfoUpscaled[0].BG3PC;
+			REG_BG3PD = mLineAffineInfoUpscaled[0].BG3PD;
+			REG_BG3X = mLineAffineInfoUpscaled[0].BG3X;
+			REG_BG3Y = mLineAffineInfoUpscaled[0].BG3Y;
 			DMA0_SRC = (uint32_t)&mLineAffineInfoUpscaled[1];
 		}
 		else
 		{
-			dmaCopyWordsAsynch(3, &mLineAffineInfoOriginal[0], (void*)&REG_BG2PA, sizeof(BG23AffineInfo));
+			REG_BG2PA = mLineAffineInfoOriginal[0].BG2PA;
+			REG_BG2PB = mLineAffineInfoOriginal[0].BG2PB;
+			REG_BG2PC = mLineAffineInfoOriginal[0].BG2PC;
+			REG_BG2PD = mLineAffineInfoOriginal[0].BG2PD;
+			REG_BG2X = mLineAffineInfoOriginal[0].BG2X;
+			REG_BG2Y = mLineAffineInfoOriginal[0].BG2Y;
+			REG_BG3PA = mLineAffineInfoOriginal[0].BG3PA;
+			REG_BG3PB = mLineAffineInfoOriginal[0].BG3PB;
+			REG_BG3PC = mLineAffineInfoOriginal[0].BG3PC;
+			REG_BG3PD = mLineAffineInfoOriginal[0].BG3PD;
+			REG_BG3X = mLineAffineInfoOriginal[0].BG3X;
+			REG_BG3Y = mLineAffineInfoOriginal[0].BG3Y;
 			DMA0_SRC = (uint32_t)&mLineAffineInfoOriginal[1];
 		}
 		DMA0_DEST = (uint32_t)&REG_BG2PA;
 		DMA0_CR = DMA_ENABLE | DMA_START_HBL | DMA_32_BIT | DMA_REPEAT | DMA_SRC_INC | DMA_DST_RESET | (sizeof(BG23AffineInfo) >> 2);
 	}
+	else
+		mKeyTimer = 0;
 	switch(state)
 	{
 	case 0:
@@ -1002,6 +965,7 @@ int main()
 {
 	mStartVideoId = NULL;
 	isVideoPlaying = FALSE;
+	mUpscalingEnabled = FALSE;
 	defaultExceptionHandler();
 	nitroFSInit(NULL);
 	soundEnable();

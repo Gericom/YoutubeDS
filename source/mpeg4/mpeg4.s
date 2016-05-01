@@ -60,6 +60,25 @@ mpeg4_VideoObjectPlane_y_loop:
 mpeg4_VideoObjectPlane_x_loop:
 			push {r6}
 			bl mpeg4_macroblock
+			//resync marker shit:
+			cmp r2, #0
+				blmi mpeg4_BitReader_FillBits
+			cmp r2, #8
+				ldrltb r12, [r1], #1
+				rsblt lr, r2, #8
+				orrlt r3, r12, lsl lr
+				addlt r2, #8
+			and r6, r2, #7
+			mov r12, r3, lsl r6
+			mov r11, #17
+			cmp r4, #1
+				ldreqb r11, [r0, #mpeg4_dec_struct__vop_fcode_forward]
+				addeq r11, #16
+			rsb r11, r11, #32
+			mov r6, r12, lsr r11//#15
+			cmp r6, #1
+				beq mpeg4_video_packet_header
+mpeg4_VideoObjectPlane_x_loop_cont:
 			pop {r6}
 			add r8, #16
 			subs r6, #16
@@ -75,6 +94,54 @@ mpeg4_VideoObjectPlane_end:
 	sub r1, r2, lsr #3
 	str r1, [r0, #mpeg4_dec_struct__pData]
 	pop {r4-r11,pc}
+
+mpeg4_video_packet_header:
+	mov r11, r11
+	pop {r6}
+	pop {r6}
+	b mpeg4_VideoObjectPlane_end
+
+	mov r3, r12
+	bic r2, #7
+	rsb r11, r11, #32
+	mov r3, r3, lsl r11//#17
+	subs r2, r11//#17
+	cmp r2, #0
+		blmi mpeg4_BitReader_FillBits
+	//macroblock number, length of 7 only applies to 176x144 videos
+	mov r3, r3, lsl #7
+	subs r2, #7
+		blmi mpeg4_BitReader_FillBits
+	mov r5, r3, lsr #27	//qscale
+	mov r3, r3, lsl #5
+	subs r2, #5
+		blmi mpeg4_BitReader_FillBits
+	ldr r12, [r0, #mpeg4_dec_struct__pdc_coef_cache_y]
+	mov r11, #1024
+	mov lr, #576
+mpeg4_video_packet_header_loop1:
+	strh r11, [r12], #2
+	subs lr, #1
+	bne mpeg4_video_packet_header_loop1
+	ldr r12, [r0, #mpeg4_dec_struct__pdc_coef_cache_uv]
+	mov lr, #288
+mpeg4_video_packet_header_loop2:
+	strh r11, [r12], #2
+	subs lr, #1
+	bne mpeg4_video_packet_header_loop2
+	mov r11, #0
+	ldr r12, [r0, #mpeg4_dec_struct__pvector_cache]
+	mov lr, #1152
+mpeg4_video_packet_header_loop3:
+	strh r11, [r12], #2
+	subs lr, #1
+	bne mpeg4_video_packet_header_loop3
+
+	adds r3, r3
+	sub r2, #1
+		bcc mpeg4_VideoObjectPlane_x_loop_cont
+	mov r11, r11
+	b mpeg4_VideoObjectPlane_x_loop_cont
 
 mpeg4_table_b6_vlc:
 	.byte 0x0, 0x1F, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11
@@ -1777,29 +1844,28 @@ mpeg4_table_b14_vlc:
 mpeg4_table_b14_length:
 	.byte 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
 
-mpeg4_dezigzag_table:
-	.byte 0x00, 0x01, 0x08, 0x10, 0x09, 0x02, 0x03, 0x0A, 0x11, 0x18, 0x20, 0x19
-	.byte 0x12, 0x0B, 0x04, 0x05, 0x0C, 0x13, 0x1A, 0x21, 0x28, 0x30, 0x29, 0x22
-	.byte 0x1B, 0x14, 0x0D, 0x06, 0x07, 0x0E, 0x15, 0x1C, 0x23, 0x2A, 0x31, 0x38
-	.byte 0x39, 0x32, 0x2B, 0x24, 0x1D, 0x16, 0x0F, 0x17, 0x1E, 0x25, 0x2C, 0x33
-	.byte 0x3A, 0x3B, 0x34, 0x2D, 0x26, 0x1F, 0x27, 0x2E, 0x35, 0x3C, 0x3D, 0x36
-	.byte 0x2F, 0x37, 0x3E, 0x3F
+//mpeg4_dezigzag_table:
+//	.byte 0x00, 0x01, 0x08, 0x10, 0x09, 0x02, 0x03, 0x0A, 0x11, 0x18, 0x20, 0x19
+//	.byte 0x12, 0x0B, 0x04, 0x05, 0x0C, 0x13, 0x1A, 0x21, 0x28, 0x30, 0x29, 0x22
+//	.byte 0x1B, 0x14, 0x0D, 0x06, 0x07, 0x0E, 0x15, 0x1C, 0x23, 0x2A, 0x31, 0x38
+//	.byte 0x39, 0x32, 0x2B, 0x24, 0x1D, 0x16, 0x0F, 0x17, 0x1E, 0x25, 0x2C, 0x33
+//	.byte 0x3A, 0x3B, 0x34, 0x2D, 0x26, 0x1F, 0x27, 0x2E, 0x35, 0x3C, 0x3D, 0x36
+//	.byte 0x2F, 0x37, 0x3E, 0x3F
 
-mpeg4_y_dc_scale_table:
-	.byte 0, 8, 8, 8, 8,10,12,14,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,34,36,38,40,42,44,46
+//mpeg4_y_dc_scale_table:
+//	.byte 0, 8, 8, 8, 8,10,12,14,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,34,36,38,40,42,44,46
 
-mpeg4_c_dc_scale_table:
-	.byte 0, 8, 8, 8, 8, 9, 9,10,10,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18,19,20,21,22,23,24,25
-
-.align 4
-
-mpeg4_dct_tmp:
-	.rept 64
-		.word 0
-	.endr
-mpeg4_dct_tmp_end:
+//mpeg4_c_dc_scale_table:
+//	.byte 0, 8, 8, 8, 8, 9, 9,10,10,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18,19,20,21,22,23,24,25
 
 .align 4
+
+//mpeg4_dct_tmp:
+//	.rept 64
+//		.word 0
+//	.endr
+
+//.align 4
 
 mpeg4_block:
 	push {lr}

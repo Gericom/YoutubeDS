@@ -14,7 +14,7 @@
 
 using namespace rapidjson;
 
-static const char* YT_VideoInfoURL = "/get_video_info?video_id=";
+static const char* YT_VideoInfoURL = "/get_video_info?el=detailpage&video_id=";
 
 static void urldecode2(char *dst, const char *src)
 {
@@ -50,15 +50,19 @@ static void urldecode2(char *dst, const char *src)
 static uint8_t* response;
 static uint8_t* pResponse;
 static int count;
+static int maxCount;
 
 static volatile char* videourl = NULL;
 
 // invoked to process response body data (may be called multiple times)
 void OnData( const happyhttp::Response* r, void* userdata, const unsigned char* data, int n )
 {
-	memcpy(pResponse, data, n);
-	pResponse += n;
-	count += n;
+	if(count + n < maxCount)
+	{
+		memcpy(pResponse, data, n);
+		pResponse += n;
+		count += n;
+	}
 }
 
 char* YT_GetVideoInfo(const char* id)
@@ -71,19 +75,18 @@ retry:
 	strcpy(resultUrl, YT_VideoInfoURL);
 	strcat(resultUrl, id);
 	iprintf(resultUrl);
-	happyhttp::Connection* mConnection = new happyhttp::Connection("www.youtube.com", 80);
-	response = (uint8_t*)malloc(96 * 1024);
+	happyhttp::Connection mConnection("www.youtube.com", 80);
+	maxCount = 64 * 1024;
+	response = (uint8_t*)malloc(maxCount);
 	pResponse = response;
 	count = 0;
 	videourl = NULL;
-	mConnection->setcallbacks( NULL, OnData, NULL, 0 );
-	mConnection->request( "GET", resultUrl);
+	mConnection.setcallbacks( NULL, OnData, NULL, 0 );
+	mConnection.request( "GET", resultUrl);
 	free(resultUrl);
 	videourl = NULL;
-	while(mConnection->outstanding())
-		mConnection->pump();
-	mConnection->close();
-	delete mConnection;
+	while(mConnection.outstanding())
+		mConnection.pump();
 	char tmpbuf[26 + 1];
 	memset(&tmpbuf[0], 0, sizeof(tmpbuf));
 	pResponse = response;

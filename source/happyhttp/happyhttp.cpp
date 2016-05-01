@@ -60,9 +60,9 @@ using namespace std;
 namespace happyhttp
 {
 
-#ifdef WIN32
-const char* GetWinsockErrorString( int err );
-#endif
+//#ifdef WIN32
+//const char* GetWinsockErrorString( int err );
+//#endif
 
 
 //---------------------------------------------------------------------
@@ -73,18 +73,18 @@ const char* GetWinsockErrorString( int err );
 
 void BailOnSocketError( const char* context )
 {
-#ifdef WIN32
+//#ifdef WIN32
 
-	int e = WSAGetLastError();
-	const char* msg = GetWinsockErrorString( e );
-#else
-	const char* msg = strerror( errno );
-#endif
+//	int e = WSAGetLastError();
+//	const char* msg = GetWinsockErrorString( e );
+//#else
+	//const char* msg = strerror( errno );
+//#endif
 	//throw Wobbly( "%s: %s", context, msg );
 }
 
 
-#ifdef WIN32
+/*#ifdef WIN32
 
 const char* GetWinsockErrorString( int err )
 {
@@ -145,7 +145,7 @@ const char* GetWinsockErrorString( int err )
 	return "unknown";
 };
 
-#endif // WIN32
+#endif // WIN32*/
 
 
 // return true if socket has data waiting to be read
@@ -357,7 +357,7 @@ void Connection::putrequest( const char* method, const char* url )
 	m_State = REQ_STARTED;
 
 	//char req[ 512 ];
-	char req[2048];//1024];
+	char req[4096];//2048];//1024];
 	sprintf( req, "%s %s HTTP/1.1", method, url );
 	m_Buffer.push_back( req );
 
@@ -439,7 +439,7 @@ void Connection::pump()
 	if( !datawaiting( m_Sock ) )
 		return;				// recv will block
 
-	unsigned char buf[ 2048 ];
+	unsigned char buf[2048];
 	int a = recv( m_Sock, (char*)buf, sizeof(buf), 0 );
 	if( a<0 )
 		BailOnSocketError( "recv()" );
