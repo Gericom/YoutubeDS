@@ -1,7 +1,7 @@
 .section .itcm
 
 COEF_RV = 27525 //Add one V aswell //93061
-COEF_GU = -22544
+COEF_GU = -11272 //Mul by 2 //-22544
 COEF_GV = -23396 //Mul by 2
 COEF_BU = 25297 //Mul by 2 and add one U aswell //116130
 
@@ -25,7 +25,6 @@ loop:
 	smlawt r5, r4, r12, r4
 	//Calculate Gbase (G - Y)
 	smulwt r6, r4, r11
-	mov r6, r6, lsl #1
 	smlawb r6, r3, r11, r6
 	//Calculate Bbase (B - Y)
 	smulwb r7, r3, r12
@@ -33,10 +32,9 @@ loop:
 
 	ldr r3, [r0], #4
 	and r4, r3, #0xFF
-	sub r4, #4
 	add r12, r10, r4
 	ldrb r4, [r12, r5]
-	ldrb r11, [r12, r6]
+	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
 	orr r4, r4, r11, lsl #5
 	orr r4, r4, r12, lsl #10
@@ -44,9 +42,10 @@ loop:
 
 	mov r11, r3, lsr #8
 	and r11, r11, #0xFF
+	add r11, #5
 	add r12, r10, r11
 	ldrb r9, [r12, r5]
-	ldrb r11, [r12, r6]
+	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
 	orr r9, r9, r11, lsl #5
 	orr r9, r9, r12, lsl #10
@@ -56,10 +55,10 @@ loop:
 	//second line
 	ldr r9, [r0, #252]
 	and r4, r9, #0xFF
-	sub r4, #1
+	add r4, #3
 	add r12, r10, r4
 	ldrb r4, [r12, r5]
-	ldrb r11, [r12, r6]
+	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
 	orr r4, r4, r11, lsl #5
 	orr r4, r4, r12, lsl #10
@@ -67,10 +66,10 @@ loop:
 
 	mov r11, r9, lsr #8
 	and r11, r11, #0xFF
-	add r11, #3
+	add r11, #8
 	add r12, r10, r11
 	ldrb r5, [r12, r5]
-	ldrb r6, [r12, r6]
+	ldrb r6, [r12, r6, lsl #1]
 	ldrb r7, [r12, r7]
 	orr r5, r5, r6, lsl #5
 	orr r5, r5, r7, lsl #10
@@ -92,7 +91,6 @@ loop:
 	smlawt r5, r4, r12, r4
 	//Calculate Gbase (G - Y)
 	smulwt r6, r4, r11
-	mov r6, r6, lsl #1
 	smlawb r6, r8, r11, r6
 	//Calculate Bbase (B - Y)
 	smulwb r7, r8, r12
@@ -100,19 +98,19 @@ loop:
 
 	mov r11, r3, lsr #16
 	and r11, r11, #0xFF
-	sub r11, #2
+	add r11, #2
 	add r12, r10, r11
 	ldrb r4, [r12, r5]
-	ldrb r11, [r12, r6]
+	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
 	orr r4, r4, r11, lsl #5
 	orr r4, r4, r12, lsl #10
 	orr r4, r4, #0x8000
 
 	add r12, r10, r3, lsr #24
-	add r12, #2
+	add r12, #7
 	ldrb r3, [r12, r5]
-	ldrb r11, [r12, r6]
+	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
 	orr r3, r3, r11, lsl #5
 	orr r3, r3, r12, lsl #10
@@ -122,19 +120,19 @@ loop:
 	//second line
 	mov r11, r9, lsr #16
 	and r11, r11, #0xFF
-	sub r11, #3
+	add r11, #1
 	add r12, r10, r11
 	ldrb r4, [r12, r5]
-	ldrb r11, [r12, r6]
+	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
 	orr r4, r4, r11, lsl #5
 	orr r4, r4, r12, lsl #10
 	orr r4, r4, #0x8000
 
 	add r12, r10, r9, lsr #24
-	add r12, #1
+	add r12, #6
 	ldrb r9, [r12, r5]
-	ldrb r11, [r12, r6]
+	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
 	orr r9, r9, r11, lsl #5
 	orr r9, r9, r12, lsl #10

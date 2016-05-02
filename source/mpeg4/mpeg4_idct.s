@@ -14,17 +14,6 @@ RND7 = 512
 
 .align 4
 
-//TAB04:
-//	.word 22725, 21407, 19266, 16384, 12873, 8867, 4520
-//TAB17:
-//	.word 31521, 29692, 26722, 22725, 17855, 12299, 6270
-//TAB26:
-//	.word 29692, 27969, 25172, 21407, 16819, 11585, 5906
-//TAB35:
-//	.word 6722, 25172, 22654, 19266, 15137, 10426, 5315
-
-//.align 4
-
 //int *in, const int *const tab, int rnd)
 mpeg4_idct_row:
 	push {r4-r11,lr}
@@ -228,9 +217,9 @@ mpeg4_idct_col_8:
 	ldr r3, [r0, #(3 << 5)]	//mm6 = (int) in[3 * 8]
 	ldr r2, [r0, #(5 << 5)]	//mm5 = (int) in[5 * 8]
 	ldr r1, [r0, #(7 << 5)]	//mm4 = (int) in[7 * 8]
-	smlawb r5, r12, r1, r4	//mm0 = MULT(TAN1, mm4, 16) + mm7
+	smlawb r5, r1, r12, r4	//mm0 = MULT(TAN1, mm4, 16) + mm7
 	rsb r11, r1, #0
-	smlawb r6, r12, r4, r11	//mm1 = MULT(TAN1, mm7, 16) - mm4
+	smlawb r6, r4, r12, r11	//mm1 = MULT(TAN1, mm7, 16) - mm4
 	smlawb r7, lr, r2, r3	//mm2 = MULT(TAN3, mm5, 16) + mm6
 	rsb r11, r2, #0
 	smlawb r8, lr, r3, r11	//mm3 = MULT(TAN3, mm6, 16) - mm5
@@ -242,18 +231,17 @@ mpeg4_idct_col_8:
 	add r3, r5, r6			//mm6 = mm0 + mm1
 	sub r2, r5, r6			//mm5 = mm0 - mm1
 
-	ldr r12,= SQRT2
-	smulwb r2, r12, r2
-	mov r2, r2, lsl #1		//mm5 = 2 * MULT(SQRT2, mm5, 16)
-	smulwb r3, r12, r3
-	mov r3, r3, lsl #1		//mm6 = 2 * MULT(SQRT2, mm6, 16)
+	ldr r12,= (SQRT2 | (TAN2 << 16))
+	smulwb r2, r2, r12
+	//mov r2, r2, lsl #1		//mm5 = 2 * MULT(SQRT2, mm5, 16)
+	smulwb r3, r3, r12
+	//mov r3, r3, lsl #1		//mm6 = 2 * MULT(SQRT2, mm6, 16)
 
-	ldr r12,= TAN2
 	ldr r6, [r0, #(2 << 5)]	//mm1 = (int) in[2 * 8]
 	ldr r7, [r0, #(6 << 5)]	//mm2 = (int) in[6 * 8]
-	smlawb r8, r12, r7, r6	//mm3 = MULT(TAN2, mm2, 16) + mm1
+	smlawt r8, r7, r12, r6	//mm3 = MULT(TAN2, mm2, 16) + mm1
 	rsb r7, r7, #0
-	smlawb r7, r12, r6, r7	//mm2 = MULT(TAN2, mm1, 16) - mm2
+	smlawt r7, r6, r12, r7	//mm2 = MULT(TAN2, mm1, 16) - mm2
 
 	//LOAD_BUTTERFLY(mm0, mm1, 0 * 8, 4 * 8, spill, in)
 	ldr r5, [r0]
@@ -271,18 +259,18 @@ mpeg4_idct_col_x_finish:
 	add r5, r4
 	sub r4, r5, r4, lsl #1
 	
-	mov r5, r5, asr #COL_SHIFT
+	//mov r5, r5, asr #COL_SHIFT
 	str r5, [r0]
-	mov r4, r4, asr #COL_SHIFT
+	//mov r4, r4, asr #COL_SHIFT
 	str r4, [r0, #(7 << 5)]
 
 	//BUTTERFLY(mm3, mm4, mm0)
 	add r8, r1
 	sub r1, r8, r1, lsl #1
 
-	mov r8, r8, asr #COL_SHIFT
+	//mov r8, r8, asr #COL_SHIFT
 	str r8, [r0, #(3 << 5)]
-	mov r1, r1, asr #COL_SHIFT
+	//mov r1, r1, asr #COL_SHIFT
 	str r1, [r0, #(4 << 5)]
 
 	//BUTTERFLY(mm1, mm2, mm0)
@@ -290,21 +278,21 @@ mpeg4_idct_col_x_finish:
 	sub r7, r6, r7, lsl #1
 
 	//BUTTERFLY(mm1, mm6, mm0)
-	add r6, r3
-	sub r3, r6, r3, lsl #1
+	add r6, r3, lsl #1
+	sub r3, r6, r3, lsl #2 //#1
 
-	mov r6, r6, asr #COL_SHIFT
+	//mov r6, r6, asr #COL_SHIFT
 	str r6, [r0, #(1 << 5)]
-	mov r3, r3, asr #COL_SHIFT
+	//mov r3, r3, asr #COL_SHIFT
 	str r3, [r0, #(6 << 5)]
 
 	//BUTTERFLY(mm2, mm5, mm0)
-	add r7, r2
-	sub r2, r7, r2, lsl #1
+	add r7, r2, lsl #1
+	sub r2, r7, r2, lsl #2 //#1
 
-	mov r7, r7, asr #COL_SHIFT
+	//mov r7, r7, asr #COL_SHIFT
 	str r7, [r0, #(2 << 5)]
-	mov r2, r2, asr #COL_SHIFT
+	//mov r2, r2, asr #COL_SHIFT
 	str r2, [r0, #(5 << 5)]
 
 	pop {r4-r11,pc}
@@ -321,7 +309,7 @@ mpeg4_idct_col_4:
 	smulwb r6, r12, r5		//mm1 = MULT(TAN1, mm0, 16)
 	smulwb r8, lr, r7		//mm3 = MULT(TAN3, mm2, 16)
 
-	ldr r12,= SQRT2
+	ldr r12,= (SQRT2 | (TAN2 << 16))
 
 	add r4, r5, r7			//mm7 = mm0 + mm2
 	sub r1, r6, r8			//mm4 = mm1 - mm3
@@ -330,36 +318,33 @@ mpeg4_idct_col_4:
 	add r3, r5, r6			//mm6 = mm0 + mm1
 	sub r2, r5, r6			//mm5 = mm0 - mm1
 
-	smulwb r2, r12, r2
-	mov r2, r2, lsl #1		//mm5 = 2 * MULT(SQRT2, mm5, 16)
-	smulwb r3, r12, r3
-	mov r3, r3, lsl #1		//mm6 = 2 * MULT(SQRT2, mm6, 16)
+	smulwb r2, r2, r12
+	//mov r2, r2, lsl #1		//mm5 = 2 * MULT(SQRT2, mm5, 16)
+	smulwb r3, r3, r12
+	//mov r3, r3, lsl #1		//mm6 = 2 * MULT(SQRT2, mm6, 16)
 
-	ldr r12,= TAN2
 	ldr r5, [r0]
 	ldr r8, [r0, #(2 << 5)]
 	mov r6, r5
-	smulwb r7, r12, r8
+	smulwt r7, r8, r12
 
 	b mpeg4_idct_col_x_finish
 
 mpeg4_idct_col_3:
 	push {r4-r11,lr}
 
-	ldr r12,= TAN1
+	ldr r12,= (TAN1 | (SQRT2 << 16))
 
 	ldr r4, [r0, #(1 << 5)]	//mm7 = (int) in[1 * 8]
-	smulwb r1, r12, r4		//mm4 = MULT(TAN1, mm7, 16)
-
-	ldr r12,= SQRT2
+	smulwb r1, r4, r12		//mm4 = MULT(TAN1, mm7, 16)
 
 	add r3, r4, r1			//mm6 = mm7 + mm4
 	sub r2, r4, r1			//mm5 = mm7 - mm4
 
-	smulwb r2, r12, r2
-	mov r2, r2, lsl #1		//mm5 = 2 * MULT(SQRT2, mm5, 16)
-	smulwb r3, r12, r3
-	mov r3, r3, lsl #1		//mm6 = 2 * MULT(SQRT2, mm6, 16)
+	smulwt r2, r2, r12
+	//mov r2, r2, lsl #1		//mm5 = 2 * MULT(SQRT2, mm5, 16)
+	smulwt r3, r3, r12
+	//mov r3, r3, lsl #1		//mm6 = 2 * MULT(SQRT2, mm6, 16)
 
 	ldr r12,= TAN2
 	ldr r5, [r0]

@@ -25,7 +25,7 @@
 #include "gui/ProgressBar.h"
 #include "print.h"
 
-#define TMP_BUFFER_SIZE		(32 * 1024)
+#define TMP_BUFFER_SIZE		(64 * 1024)
 
 static uint8_t mVideoTmpBuffer[TMP_BUFFER_SIZE] __attribute__ ((aligned (32)));
 
@@ -49,7 +49,7 @@ static volatile int mUpscalingEnabled = false;
 
 #define AUDIO_BLOCK_SIZE	(1024)
 
-#define NR_WAVE_DATA_BUFFERS	(256)//(32)
+#define NR_WAVE_DATA_BUFFERS	(128)//(32)
 
 #define WAVE_DATA_BUFFER_LENGTH		(AUDIO_BLOCK_SIZE * NR_WAVE_DATA_BUFFERS)
 
@@ -394,7 +394,7 @@ static BG23AffineInfo mLineAffineInfoUpscaled[192] __attribute__ ((aligned (32))
 
 #define USE_WIFI
 
-void PlayVideo()
+ITCM_CODE void PlayVideo()
 {
 	stopVideo = FALSE;
 	curBlock = -1;
@@ -540,7 +540,7 @@ void PlayVideo()
 	if(timescale == 12)
 		timerStart(0, ClockDivider_1024, TIMER_FREQ_1024(12), frameHandler);
 	else if(timescale == 8333)
-		timerStart(0, ClockDivider_1024, /*TIMER_FREQ_1024(8)*/-3928, frameHandler);
+		timerStart(0, ClockDivider_1024, -3928, frameHandler);
 	else if(timescale == 6)
 		timerStart(0, ClockDivider_1024, TIMER_FREQ_1024(6), frameHandler);
 	else 
@@ -594,7 +594,7 @@ void PlayVideo()
 		//sprintf(tmp,"0x%x",time);
 		//mToolbar->SetTitle(tmp);
 		frame++;
-		if(offset == nextAudioBlockOffset)
+		if(frame < nrframes && offset == nextAudioBlockOffset)
 		{
 			offset = READ_SAFE_UINT32_BE(videoBlockOffsets);
 			int audiosize = offset - nextAudioBlockOffset;
@@ -626,11 +626,8 @@ void PlayVideo()
 			audioBlockOffsets += 4;
 		}
 		while(nrFramesInQueue >= NR_FRAME_BLOCKS || lastQueueBlock == curBlock);
-		//{
-		//	if(stopVideo) goto video_stop;
-		//}
 		//cpuStartTiming(2);
-		yuv2rgb_new(mpeg4DecStruct.pDstY, mpeg4DecStruct.pDstUV, &mFrameQueue[lastQueueBlock * FRAME_SIZE]);//(uint16_t*)frameOffsets[lastQueueBlock]);
+		yuv2rgb_new(mpeg4DecStruct.pDstY, mpeg4DecStruct.pDstUV, &mFrameQueue[lastQueueBlock * FRAME_SIZE]);
 		DC_FlushRange(&mFrameQueue[lastQueueBlock * FRAME_SIZE], FRAME_SIZE * 2);
 		//uint32_t time = cpuEndTiming();
 		//char tmp[21];
@@ -723,7 +720,7 @@ static int mTextCursorBlinking;
 static int mTextCursorCounter;
 static int mKeyTimer = 0;
 
-void VBlankProc()
+ITCM_CODE void VBlankProc()
 {
 	scanKeys();
 	int held = keysHeld();
@@ -983,9 +980,9 @@ int main()
 	}
 	BG_PALETTE[0] = 0;
 	vramSetBankE(VRAM_E_MAIN_BG);
-	vramSetBankA(VRAM_A_MAIN_BG_0x06020000);
-	vramSetBankB(VRAM_B_MAIN_BG_0x06040000);
-	vramSetBankC(VRAM_C_MAIN_BG_0x06060000);
+	//vramSetBankA(VRAM_A_MAIN_BG_0x06020000);
+	//vramSetBankB(VRAM_B_MAIN_BG_0x06040000);
+	//vramSetBankC(VRAM_C_MAIN_BG_0x06060000);
 	vramSetBankF(VRAM_F_MAIN_SPRITE_0x06400000);
 	vramSetBankG(VRAM_G_MAIN_SPRITE_0x06404000);
 	file = fopen("/Logo.nbfc", "rb");
