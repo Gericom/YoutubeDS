@@ -1,5 +1,6 @@
 .section .itcm
 .include "mpeg4_header.s"
+#define WIDTH_256
 
 DITHER_COEF_OFFSET = 0 //-4
 
@@ -26,12 +27,11 @@ COEF_GU = -11272 //Mul by 2 //-22544
 COEF_GV = -23396 //Mul by 2
 COEF_BU = 25297 //Mul by 2 and add one U aswell //116130
 
-.global yuv2rgb_new
-yuv2rgb_new:
+.macro gen_yuv2rgb fullwidth
 	stmfd sp!, {r4-r11, lr}
 	ldr r10,= (YUV2RGB_ClampRangeBitTable + 256)
 	ldr lr,= (144*128)//(144*128)//(192 * 128)
-loop:
+1:
 	add r1, #(STRIDE >> 1)
 	ldrh r9, [r1]//, #128]
 	sub r1, #(STRIDE >> 1)
@@ -99,7 +99,7 @@ loop:
 	orr r5, r5, r7, lsl #10
 	orr r5, r5, #0x8000
 	orr r5, r4, r5, lsl #16
-	str r5, [r2, #348]//#508]
+	str r5, [r2, #508]//#348]//#508]
 
 	//loop unrolling
 
@@ -162,27 +162,44 @@ loop:
 	orr r9, r9, r12, lsl #10
 	orr r9, r9, #0x8000
 	orr r9, r4, r9, lsl #16
-	str r9, [r2, #348]//#508]
+	str r9, [r2, #508]//#348]
 
 	subs lr, lr, #4
 	ldmlefd sp!, {r4-r11, pc}
+.if \fullwidth
+	tst lr, #0xFF
+.else
 	and r9, lr, #0xFF
 	cmp r9, #80
-	bne loop
-	//tst lr, #0xFF
-	//bne loop
+.endif
+	bne 1b
+.if !\fullwidth
 	subeq lr, #80
 	addeq r0, #80
 	addeq r1, #40
+.endif
 	cmp lr, #0
 	ldmlefd sp!, {r4-r11, pc}
 	tst lr, #0xFF
-	bne loop
+	bne 1b
 
 	add r0, r0, #256 //#(STRIDE + 256) //#256
 	add r1, r1, #128 //#((STRIDE >> 1) + 128) //#128
-	add r2, r2, #352 //#192 //#352 //#512
+.if \fullwidth
+	add r2, r2, #512 //#352 //#192 //#352 //#512
+.else
+	add r2, r2, #(512 + 160)
+.endif
 
-	b loop
+	b 1b
+.endm
+
+.global y2r_convert176
+y2r_convert176:
+	gen_yuv2rgb 0
+
+.global y2r_convert256
+y2r_convert256:
+	gen_yuv2rgb 1
 
 .pool

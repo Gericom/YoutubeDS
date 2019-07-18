@@ -27,6 +27,10 @@
 #include "print.h"
 #include "mpu.h"
 #include "mpeg4/mpeg4_header.s"
+#include "aacShared.h"
+#include "lock.h"
+
+#define AAC_ARM7
 
 #define VIDEO_HEIGHT	144
 
@@ -36,7 +40,12 @@ static uint8_t mVideoTmpBuffer[TMP_BUFFER_SIZE] __attribute__ ((aligned (32)));
 
 static uint8_t mAudioTmpBuffer[TMP_BUFFER_SIZE] __attribute__ ((aligned (32)));
 
+//static DTCM_DATA uint8_t sDtcmVideoBuf[4096];
+
 static mpeg4_dec_struct mpeg4DecStruct __attribute__ ((aligned (32)));
+
+static aac_queue_t sAACQueue __attribute__ ((aligned (32)));
+static aac_queue_t* sAACQueueUncached;
 
 //static uint8_t mYBufferA[FB_STRIDE * VIDEO_HEIGHT] __attribute__ ((aligned (32)));
 //static uint8_t mYBufferB[FB_STRIDE * VIDEO_HEIGHT] __attribute__ ((aligned (32)));
@@ -77,6 +86,8 @@ static volatile int lastQueueBlock = 0;//block to write to (most of the time (fi
 static uint8_t mYBuffer[NR_FRAME_BLOCKS][FB_STRIDE * VIDEO_HEIGHT] __attribute__ ((aligned (32)));
 static uint8_t mUVBuffer[NR_FRAME_BLOCKS][FB_STRIDE * (VIDEO_HEIGHT / 2)] __attribute__ ((aligned (32)));
 
+static int sVideoWidth;
+
 static RingBufferHttpStream* mRingBufferHttpStream;
 
 static volatile int nrFramesMissed = 0;
@@ -88,310 +99,9 @@ static volatile int isVideoPlaying;
 
 static char* mStartVideoId;
 
-class TestTextSlice : public ListElementSlice
-{
-	char* mText;
-	char* mVideoId;
-	int mTextInvalidated;
-	int mPenDown;
-	int mPenDownX;
-	int mPenDownY;
-	NTFT_FONT* mFont;
-public:
-	TestTextSlice(const char* text, const char* videoId, NTFT_FONT* font)
-		: mText(NULL), mVideoId(NULL), mTextInvalidated(TRUE), mFont(font), mPenDown(FALSE)
-	{
-		SetText(text);
-		mVideoId = Util_CopyString(videoId);
-	}
-
-	~TestTextSlice()
-	{
-		if(mText)
-			free(mText);
-		if(mVideoId)
-			free(mVideoId);
-	}
-
-	int OnPenDown(void* context, int x, int y)
-	{
-		if(y < mY) return FALSE;
-		if(y >= (mY + 64)) return FALSE;
-		mPenDown = TRUE;
-		mPenDownX = x;
-		mPenDownY = y;
-		return TRUE;
-	}
-
-	int OnPenMove(void* context, int x, int y)
-	{
-		if(y < mY) return FALSE;
-		if(y >= (mY + 64)) return FALSE;
-		return TRUE;
-	}
-
-	int OnPenUp(void* context, int x, int y)
-	{
-		if(y < mY) return FALSE;
-		if(y >= (mY + 64)) return FALSE;
-		if(mPenDown && abs(mPenDownX - x) < 16 && abs(mPenDownY - y) < 16)
-		{
-			//start the video
-			stopVideo = TRUE;
-			mStartVideoId = Util_CopyString(mVideoId);
-		}
-		mPenDown = FALSE;
-		return TRUE;
-	}
-
-	void OnInitializeVram()
-	{
-		int w, h;
-		Font_GetStringSize(mFont, mText, &w, &h);
-		uint8_t* tmp = (uint8_t*)malloc(256 * 32);
-		memset(tmp, 0, 256 * 32);
-		Font_CreateStringData(mFont, mText, tmp + (16 - ((h + 1) >> 1)) * 256, 256);
-		Util_ConvertToObj(tmp, 64, 32, 256, &SPRITE_GFX_SUB[mOAMVramOffset / 2]);
-		Util_ConvertToObj(tmp + 64, 64, 32, 256, &SPRITE_GFX_SUB[mOAMVramOffset / 2 + 512]);
-		Util_ConvertToObj(tmp + 2 * 64, 64, 32, 256, &SPRITE_GFX_SUB[mOAMVramOffset / 2 + 2 * 512]);
-		Util_ConvertToObj(tmp + 3 * 64, 64, 32, 256, &SPRITE_GFX_SUB[mOAMVramOffset / 2 + 3 * 512]);
-		free(tmp);
-		mTextInvalidated = FALSE;
-	}
-
-	void Render(void* context)
-	{
-		OAM_SUB[mFirstOAMIdx * 4] = ATTR0_NORMAL | ATTR0_TYPE_NORMAL | ATTR0_COLOR_16 | ATTR0_WIDE | OBJ_Y(mY);
-		OAM_SUB[mFirstOAMIdx * 4 + 1] = ATTR1_SIZE_64 | OBJ_X(0);
-		OAM_SUB[mFirstOAMIdx * 4 + 2] = ATTR2_PRIORITY(3) | ATTR2_PALETTE(5) | (mOAMVramOffset / 64);
-		OAM_SUB[(mFirstOAMIdx + 1) * 4] = ATTR0_NORMAL | ATTR0_TYPE_NORMAL | ATTR0_COLOR_16 | ATTR0_WIDE | OBJ_Y(mY);
-		OAM_SUB[(mFirstOAMIdx + 1) * 4 + 1] = ATTR1_SIZE_64 | OBJ_X(64);
-		OAM_SUB[(mFirstOAMIdx + 1) * 4 + 2] = ATTR2_PRIORITY(3) | ATTR2_PALETTE(5) | ((mOAMVramOffset / 64) + 16);
-		OAM_SUB[(mFirstOAMIdx + 2) * 4] = ATTR0_NORMAL | ATTR0_TYPE_NORMAL | ATTR0_COLOR_16 | ATTR0_WIDE | OBJ_Y(mY);
-		OAM_SUB[(mFirstOAMIdx + 2) * 4 + 1] = ATTR1_SIZE_64 | OBJ_X(2 * 64);
-		OAM_SUB[(mFirstOAMIdx + 2) * 4 + 2] = ATTR2_PRIORITY(3) | ATTR2_PALETTE(5) | ((mOAMVramOffset / 64) + 2 * 16);
-		OAM_SUB[(mFirstOAMIdx + 3) * 4] = ATTR0_NORMAL | ATTR0_TYPE_NORMAL | ATTR0_COLOR_16 | ATTR0_WIDE | OBJ_Y(mY);
-		OAM_SUB[(mFirstOAMIdx + 3) * 4 + 1] = ATTR1_SIZE_64 | OBJ_X(3 * 64);
-		OAM_SUB[(mFirstOAMIdx + 3) * 4 + 2] = ATTR2_PRIORITY(3) | ATTR2_PALETTE(5) | ((mOAMVramOffset / 64) + 3 * 16);
-	}
-
-	void CleanupVRAM()
-	{
-		OAM_SUB[mFirstOAMIdx * 4] = ATTR0_DISABLED;
-		OAM_SUB[(mFirstOAMIdx + 1) * 4] = ATTR0_DISABLED;
-		OAM_SUB[(mFirstOAMIdx + 2) * 4] = ATTR0_DISABLED;
-		OAM_SUB[(mFirstOAMIdx + 3) * 4] = ATTR0_DISABLED;
-	}
-
-	void SetText(const char* text)
-	{
-		if(mText != NULL)
-			free(mText);
-		if(text == NULL)
-			mText = Util_CopyString("");
-		else 
-			mText = Util_CopyString(text);
-		mTextInvalidated = TRUE;
-	}
-};
-
-class TestLoadingSlice : public ListElementSlice
-{
-private:
-	ProgressBar* mProgressBar;
-public:
-	TestLoadingSlice()
-		: mProgressBar(NULL)
-	{ }
-
-	~TestLoadingSlice()
-	{
-		if(mProgressBar)
-			delete mProgressBar;
-	}
-
-	int OnPenDown(void* context, int x, int y)
-	{
-		if(y < mY) return FALSE;
-		if(y >= (mY + 64)) return FALSE;
-		return TRUE;
-	}
-
-	int OnPenMove(void* context, int x, int y)
-	{
-		if(y < mY) return FALSE;
-		if(y >= (mY + 64)) return FALSE;
-		return TRUE;
-	}
-
-	int OnPenUp(void* context, int x, int y)
-	{
-		if(y < mY) return FALSE;
-		if(y >= (mY + 64)) return FALSE;
-		return TRUE;
-	}
-
-	void OnInitializeVram()
-	{
-		if(mProgressBar)
-			delete mProgressBar;
-		mProgressBar = new ProgressBar(mFirstOAMIdx);
-	}
-
-	void Render(void* context)
-	{
-		mProgressBar->SetPosition(mX + 112, mY);
-		mProgressBar->Render(context);
-	}
-
-	void CleanupVRAM()
-	{
-		if(mProgressBar)
-			mProgressBar->CleanupVRAM();
-	}
-};
-
-class TestAdapter : public PagingListSliceAdapter
-{
-private:
-	NTFT_FONT* mFont;
-	happyhttp::Connection* mConnection;
-	int mCurrentlyRequestingPage;
-	int mRequestInitialized;
-	char* mRequestURL;
-	char* mSearchQuery;
-	uint8_t* mResponse;
-	uint8_t* mpResponse;
-public:
-	static void OnHttpConnectionData(const happyhttp::Response* r, void* userdata, const unsigned char* data, int n)
-	{
-		((TestAdapter*)userdata)->OnHttpConnectionData(r, data, n);
-	}
-
-	void OnHttpConnectionData(const happyhttp::Response* r, const unsigned char* data, int n)
-	{
-		memcpy(mpResponse, data, n);
-		mpResponse += n;
-	}
-
-	static void OnHttpConnectionComplete(const happyhttp::Response* r, void* userdata)
-	{
-		((TestAdapter*)userdata)->OnHttpConnectionComplete(r);
-	}
-
-	void OnHttpConnectionComplete(const happyhttp::Response* r)
-	{
-		mpResponse[0] = 0;
-		YT_SearchListResponse* pageData = YT_Search_ParseResponse((char*)mResponse);
-		free(mResponse);
-		mResponse = NULL;
-		mpResponse = NULL;
-		SetPageData(mCurrentlyRequestingPage, pageData);
-		mCurrentlyRequestingPage = -1;
-		mRequestInitialized = FALSE;
-	}
-
-	TestAdapter(NTFT_FONT* font, const char* searchQuery)
-		: PagingListSliceAdapter(64, 4, 4096, 10), mFont(font), mConnection(NULL), mCurrentlyRequestingPage(-1), mRequestInitialized(FALSE), mRequestURL(NULL),
-			mSearchQuery(NULL), mResponse(NULL), mpResponse(NULL)
-	{
-		mSearchQuery = Util_CopyString(searchQuery);
-	}
-
-	~TestAdapter()
-	{
-		if(mPageDatas[0])
-			OnFreePageData(mPageDatas[0]);
-		if(mPageDatas[1])
-			OnFreePageData(mPageDatas[1]);
-		if(mPageDatas[2])
-			OnFreePageData(mPageDatas[2]);
-		if(mSearchQuery)
-			free(mSearchQuery);
-		if(mResponse)
-			free(mResponse);
-		if(mConnection)
-			delete mConnection;
-	}
-
-	ListElementSlice* GetPageSlice(void* pageData, int index)
-	{
-		return new TestTextSlice(((YT_SearchListResponse*)pageData)->searchResults[index].title, ((YT_SearchListResponse*)pageData)->searchResults[index].videoId, mFont);
-	}
-
-	ListElementSlice* GetLoadingSlice()
-	{
-		return new TestLoadingSlice();
-	}
-
-	void OnRequestPageData(int page)
-	{
-		if(mCurrentlyRequestingPage >= 0) return;
-		char* pagetoken = NULL;
-		if(page)//!(mCurPage == 0 && page == 0 && mPageDatas[2] == NULL))
-		{
-			if(page == mCurPage && mPageDatas[0])
-			{
-				if(!((YT_SearchListResponse*)mPageDatas[0])->nextPageToken) return;
-				pagetoken = ((YT_SearchListResponse*)mPageDatas[0])->nextPageToken;
-			}
-			else if(page == mCurPage && mPageDatas[2])
-			{
-				if(!((YT_SearchListResponse*)mPageDatas[2])->prevPageToken) return;
-				pagetoken = ((YT_SearchListResponse*)mPageDatas[2])->prevPageToken;
-			}
-			else if(page == mCurPage - 1 && mPageDatas[1])
-			{
-				if(!((YT_SearchListResponse*)mPageDatas[1])->prevPageToken) return;
-				pagetoken = ((YT_SearchListResponse*)mPageDatas[1])->prevPageToken;
-			}
-			else if(page == mCurPage + 1 && mPageDatas[1])
-			{
-				if(!((YT_SearchListResponse*)mPageDatas[1])->nextPageToken) return;
-				pagetoken = ((YT_SearchListResponse*)mPageDatas[1])->nextPageToken;
-			}
-			else return;
-		}
-		mCurrentlyRequestingPage = page;
-		mRequestURL = YT_Search_GetURL(mSearchQuery, 10, pagetoken);
-		mResponse = (uint8_t*)malloc(32 * 1024);
-		mpResponse = mResponse;
-		mRequestInitialized = FALSE;
-	}
-
-	void OnFreePageData(void* pageData)
-	{
-		YT_FreeSearchListResponse((YT_SearchListResponse*)pageData);
-	}
-
-	void DoFrameProc()
-	{
-		if(mCurrentlyRequestingPage >= 0 && !mRequestInitialized)
-		{
-			if(mConnection)
-				delete mConnection;
-			mConnection = new happyhttp::Connection("florian.nouwt.com", 80);
-			mConnection->setcallbacks(NULL, TestAdapter::OnHttpConnectionData, TestAdapter::OnHttpConnectionComplete, this);
-			mConnection->request("GET", mRequestURL);
-			free(mRequestURL);
-			mRequestURL = NULL;
-			mRequestInitialized = TRUE;
-		}
-		if(mConnection && mConnection->outstanding())
-			mConnection->pump();
-	}
-};
 static int mDoubleSpeedEnabled = 0;
 
-static NTFT_FONT* roboto_medium_13;
-static NTFT_FONT* roboto_regular_10;
-static UIManager* mUIManager;
-static Toolbar* mToolbar;
-static ScreenKeyboard* mKeyboard;
-static TestAdapter* mTestAdapter;
-static ListSlice* mList;
-
-#define FRAME_SIZE	(176 * 144)
+#define FRAME_SIZE	(256 * 144)//(176 * 144)
 //static uint16_t mFrameQueue[FRAME_SIZE * NR_FRAME_BLOCKS] __attribute__ ((aligned (32)));
 
 static volatile int mShouldCopyFrame;
@@ -419,11 +129,37 @@ void StartTimer(int timescale)
 	else if(timescale == 30000)
 		timerStart(0, ClockDivider_1024, TIMER_FREQ_1024(30) / (mDoubleSpeedEnabled + 1), frameHandler);
 	else if(timescale == 24000)
-		timerStart(0, ClockDivider_1024, TIMER_FREQ_1024(24) / (mDoubleSpeedEnabled + 1), frameHandler);
+		timerStart(0, ClockDivider_1024, -1365 / (mDoubleSpeedEnabled + 1), frameHandler);
 	else if(timescale == 999)
 		timerStart(0, ClockDivider_1024, -3276 / (mDoubleSpeedEnabled + 1), frameHandler);
 	else 
 		timerStart(0, ClockDivider_1024, TIMER_FREQ_1024(10) / (mDoubleSpeedEnabled + 1), frameHandler);
+}
+
+static void aac_setQueueArm7()
+{
+	fifoSendValue32(FIFO_AAC, (AAC_FIFO_CMD_SET_QUEUE << 28) | ((u32)&sAACQueue));
+}
+
+static void aac_startDecArm7(int sampleRate)
+{
+	fifoSendValue32(FIFO_AAC, (AAC_FIFO_CMD_DECSTART << 28) | (sampleRate & 0x0FFFFFFF));
+}
+
+static void aac_stopDecArm7()
+{
+	fifoSendValue32(FIFO_AAC, AAC_FIFO_CMD_DECSTOP << 28);
+}
+
+static inline void aac_notifyBlock()
+{
+	fifoSendValue32(FIFO_AAC, AAC_FIFO_CMD_NOTIFY_BLOCK << 28);
+}
+
+static void aac_initQueue()
+{
+	memset(&sAACQueue, 0, sizeof(sAACQueue));
+	sAACQueueUncached = (aac_queue_t*)memUncached(&sAACQueue);
 }
 
 ITCM_CODE void PlayVideo()
@@ -479,7 +215,6 @@ ITCM_CODE void PlayVideo()
 #endif
 	memset(&mpeg4DecStruct, 0, sizeof(mpeg4DecStruct));
 	mpeg4DecStruct.pData = &mVideoTmpBuffer[0];
-	mpeg4DecStruct.width = 176;
 	mpeg4DecStruct.height = 144;
 	mpeg4DecStruct.pDstY = &mYBuffer[0][0];
 	mpeg4DecStruct.pDstUV = &mUVBuffer[0][0];
@@ -504,6 +239,7 @@ ITCM_CODE void PlayVideo()
 	uint8_t* videoBlockOffsets;
 	int nrframes;
 	uint8_t* audioBlockOffsets;
+	int audioRate;
 	//parse atoms
 	while(pHeader < pHeaderEnd)
 	{
@@ -531,6 +267,10 @@ ITCM_CODE void PlayVideo()
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip vmhd
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip dinf
 					ptr += 8;	//skip stbl
+
+					//stsd
+					sVideoWidth = READ_SAFE_UINT32_BE(ptr + 0x2E);
+					printf("width: %d\n", sVideoWidth);
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stsd
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stts
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stss
@@ -552,6 +292,9 @@ ITCM_CODE void PlayVideo()
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip smhd
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip dinf
 					ptr += 8;	//skip stbl
+					//stsd
+					audioRate = READ_SAFE_UINT32_BE(ptr + 0x2E);
+					printf("audiorate: %d\n", audioRate);
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stsd
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stts
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stsc
@@ -563,6 +306,8 @@ ITCM_CODE void PlayVideo()
 		}
 		pHeader += size;
 	}
+
+	mpeg4DecStruct.width = sVideoWidth;
 
 	uint32_t offset = READ_SAFE_UINT32_BE(videoBlockOffsets);
 	uint32_t nextAudioBlockOffset = READ_SAFE_UINT32_BE(audioBlockOffsets);	
@@ -584,33 +329,51 @@ ITCM_CODE void PlayVideo()
 	bgInit(2, BgType_Bmp8, BgSize_B16_256x256, 0,0);
 	bgInit(3, BgType_Bmp8, BgSize_B16_256x256, 0,0);
 	REG_DISPCNT &= ~(DISPLAY_BG0_ACTIVE | DISPLAY_BG1_ACTIVE | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
-	if(!mUpscalingEnabled)
+	REG_DISPCNT |= /*DISPLAY_WIN0_ON |*/ DISPLAY_BG2_ACTIVE | (mpeg4DecStruct.width == 256 ? 0 : DISPLAY_BG3_ACTIVE);
+
+	REG_BG2PA = mpeg4DecStruct.width == 256 ? 256 : 176;
+	REG_BG2PB = 0;
+	REG_BG2PC = 0;
+	REG_BG2PD = 256;
+	REG_BG2X = 0;
+	REG_BG2Y = -24 << 8;
+
+	if(mpeg4DecStruct.width != 256)
 	{
-		WIN0_X0 = 40;
-		WIN0_X1 = 40 + 176;
-		WIN0_Y0 = 24;
-		WIN0_Y1 = 24 + 144;
-		WIN_IN = (1 << 3) | (1 << 2);
-		REG_DISPCNT |= /*DISPLAY_WIN0_ON |*/ DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE;
+		REG_BG3PA = 176;
+		REG_BG3PB = 0;
+		REG_BG3PC = 0;
+		REG_BG3PD = 256;
+		REG_BG3X = 80;
+		REG_BG3Y = -24 << 8;
+		REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_SRC_BG3 | BLEND_DST_BG2 | BLEND_DST_BG3 | BLEND_DST_BACKDROP;
+		REG_BLDALPHA = 8 | (8 << 8);
 	}
 	else
-		REG_DISPCNT |= DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE;
+		REG_BLDCNT = 0;
 
+	
+
+	aac_initQueue();
+#ifdef AAC_ARM7
+	aac_startDecArm7(audioRate);
+#else
 	HAACDecoder aacDec = AACInitDecoder();
 	AACFrameInfo frameInfo;
 	frameInfo.bitRate = 0;
 	frameInfo.nChans = 1;
-	frameInfo.sampRateCore = 22050;
-	frameInfo.sampRateOut = 22050;
+	frameInfo.sampRateCore = audioRate;
+	frameInfo.sampRateOut = audioRate;
 	frameInfo.bitsPerSample = 16;
 	frameInfo.outputSamps = 0;
 	frameInfo.profile = 0;
 	frameInfo.tnsUsed = 0;
 	frameInfo.pnsUsed = 0;
 	AACSetRawBlockParams(aacDec, 0, &frameInfo);
+#endif
 	stopVideo = FALSE;
 	mTimeScale = timescale;
-	isVideoPlaying = TRUE;
+	
 	int frame = 0;
 	StartTimer(timescale);
 	int keytimer = 0;
@@ -620,14 +383,25 @@ ITCM_CODE void PlayVideo()
 		{
 			offset = READ_SAFE_UINT32_BE(videoBlockOffsets);
 			int audiosize = offset - nextAudioBlockOffset;
-			videoBlockOffsets += 4;
+			videoBlockOffsets += 4;		
+			
+#ifdef AAC_ARM7
+			while(sAACQueueUncached->blockCount == AAC_QUEUE_BLOCK_COUNT);
+			fread(&sAACQueue.queue[sAACQueueUncached->writeBlock][0], 1, audiosize, video);
+			//DC_FlushRange(&sAACQueue.queue[sAACQueue.writeBlock][0], (audiosize + 31) & ~0x1F);
+			sAACQueueUncached->queueBlockLength[sAACQueueUncached->writeBlock] = audiosize;
+			//sAACQueue.writeBlock = (sAACQueue.writeBlock + 1) % AAC_QUEUE_BLOCK_COUNT;
+			sAACQueueUncached->writeBlock = (sAACQueueUncached->writeBlock + 1) % AAC_QUEUE_BLOCK_COUNT;
+			lock_lock(&sAACQueueUncached->countLock);
+			{
+				sAACQueueUncached->blockCount++;
+			}
+			lock_unlock(&sAACQueueUncached->countLock);
+			aac_notifyBlock();
+#else
 			uint8_t* audioData = &mAudioTmpBuffer[0];
 			uint8_t* audioDataptr = audioData;
-#ifdef USE_WIFI
-			mRingBufferHttpStream->Read(audioData, audiosize);
-#else
 			fread(audioData, 1, audiosize, video);
-#endif
 			while(audiosize > 0)
 			{
 				int err = 0;
@@ -640,24 +414,34 @@ ITCM_CODE void PlayVideo()
 			}
 			if(!hasAudioStarted)
 			{
-				soundIdL = soundPlaySample(&mWaveData[0], SoundFormat_16Bit, sizeof(mWaveData), 22050 * (mDoubleSpeedEnabled + 1), 127, 0, true, 0);
-				soundIdR = soundPlaySample(&mWaveData[0], SoundFormat_16Bit, sizeof(mWaveData), 22050 * (mDoubleSpeedEnabled + 1), 127, 127, true, 0);
+				soundIdL = soundPlaySample(&mWaveData[0], SoundFormat_16Bit, sizeof(mWaveData), audioRate * (mDoubleSpeedEnabled + 1), 127, 0, true, 0);
+				soundIdR = soundPlaySample(&mWaveData[0], SoundFormat_16Bit, sizeof(mWaveData), audioRate * (mDoubleSpeedEnabled + 1), 127, 127, true, 0);
 				hasAudioStarted = true;
 			}
+#endif
+			//fread(&sAACQueueUncached->queue[sAACQueue.writeBlock][0], 1, audiosize, video);
+			//fread(audioData, 1, audiosize, video);
 			nextAudioBlockOffset = READ_SAFE_UINT32_BE(audioBlockOffsets);
 			audioBlockOffsets += 4;
 		}
 
 		uint32_t size = READ_SAFE_UINT32_BE(framesizes);
 		framesizes += 4;
-#ifdef USE_WIFI
-		mRingBufferHttpStream->Read(&mVideoTmpBuffer[0], size);
-#else
-		fread(&mVideoTmpBuffer[0], 1, size, video);
-#endif
+		// if(size < sizeof(sDtcmVideoBuf))
+		// {
+		// 	fread(sDtcmVideoBuf, 1, size, video);
+		// 	mpeg4DecStruct.pData = (u8*)sDtcmVideoBuf;
+		// }
+		// else
+		// {
+			fread(&mVideoTmpBuffer[0], 1, size, video);
+			mpeg4DecStruct.pData = (u8*)&mVideoTmpBuffer[0];
+		// }
 		offset += size;
-		mpeg4DecStruct.pData = &mVideoTmpBuffer[0];
-		while(nrFramesInQueue >= NR_FRAME_BLOCKS - 1 || lastQueueBlock == curBlock);		
+		//DC_InvalidateRange(VRAM_E, (size + 0x1F) & ~0x1F);
+		//dmaCopyWords(3, &mVideoTmpBuffer[0], VRAM_E, (size + 3) & ~3);
+		//mpeg4DecStruct.pData = (u8*)&mVideoTmpBuffer[0];
+		while(nrFramesInQueue >= NR_FRAME_BLOCKS - 1 || lastQueueBlock == curBlock);
 		mpeg4DecStruct.pPrevY = mpeg4DecStruct.pDstY;
 		mpeg4DecStruct.pPrevUV = mpeg4DecStruct.pDstUV;
 		mpeg4DecStruct.pDstY = &mYBuffer[lastQueueBlock][0];
@@ -672,8 +456,8 @@ ITCM_CODE void PlayVideo()
 			mpeg4DecStruct.pData += 7;
 		mpeg4DecStruct.pData += 4;//skip 000001B6
 
-		if(frame == 357)
-			asm volatile("mov r11, r11");
+		//if(frame == 357)
+		//	asm volatile("mov r11, r11");
 		//cpuStartTiming(2);
 		mpeg4_VideoObjectPlane(&mpeg4DecStruct);
 		//uint32_t time = cpuEndTiming();
@@ -683,7 +467,9 @@ ITCM_CODE void PlayVideo()
 		//sprintf(tmp,"0x%x",time);
 		//mToolbar->SetTitle(tmp);
 		frame++;
-		if(frame < nrframes && offset == nextAudioBlockOffset)
+		if(frame == 6)
+			isVideoPlaying = TRUE;
+		/*if(frame < nrframes && offset == nextAudioBlockOffset)
 		{
 			offset = READ_SAFE_UINT32_BE(videoBlockOffsets);
 			int audiosize = offset - nextAudioBlockOffset;
@@ -713,7 +499,7 @@ ITCM_CODE void PlayVideo()
 			}
 			nextAudioBlockOffset = READ_SAFE_UINT32_BE(audioBlockOffsets);
 			audioBlockOffsets += 4;
-		}
+		}*/
 		//while(nrFramesInQueue >= NR_FRAME_BLOCKS || lastQueueBlock == curBlock);
 		//cpuStartTiming(2);
 		//yuv2rgb_new(mpeg4DecStruct.pDstY, mpeg4DecStruct.pDstUV, &mFrameQueue[lastQueueBlock * FRAME_SIZE]);
@@ -738,6 +524,9 @@ video_stop:
 	REG_DISPCNT &= ~(DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
 	DMA0_CR = 0;
 	isVideoPlaying = FALSE;
+#ifdef AAC_ARM7
+	aac_stopDecArm7();
+#else
 	if(hasAudioStarted)
 	{
 		soundKill(soundIdL);
@@ -745,11 +534,8 @@ video_stop:
 		hasAudioStarted = FALSE;
 	}
 	AACFreeDecoder(aacDec);
-#ifdef USE_WIFI
-	delete mRingBufferHttpStream;
-#else
-	fclose(video);
 #endif
+	fclose(video);
 	free(mVideoHeader);
 }
 
@@ -818,36 +604,18 @@ ITCM_CODE void VBlankProc()
 {
 	if(isVideoPlaying)//stride dma and frame copy
 	{
-		DMA0_CR = 0;
-		BG23AffineInfo* data = mFilterFrame ? mLineAffineInfoUpscaled : mLineAffineInfoOriginal;
-		REG_BG2PA = data[0].BG2PA;
-		REG_BG2PB = data[0].BG2PB;
-		REG_BG2PC = data[0].BG2PC;
-		REG_BG2PD = data[0].BG2PD;
-		REG_BG2X = data[0].BG2X;
-		REG_BG2Y = data[0].BG2Y;
-		REG_BG3PA = data[0].BG3PA;
-		REG_BG3PB = data[0].BG3PB;
-		REG_BG3PC = data[0].BG3PC;
-		REG_BG3PD = data[0].BG3PD;
-		REG_BG3X = data[0].BG3X;
-		REG_BG3Y = data[0].BG3Y;
-		DMA0_SRC = (uint32_t)&data[1];
-		mFilterFrame = !mFilterFrame;
-		DMA0_DEST = (uint32_t)&REG_BG2PA;
-		DMA0_CR = DMA_ENABLE | DMA_START_HBL | DMA_32_BIT | DMA_REPEAT | DMA_SRC_INC | DMA_DST_RESET | (sizeof(BG23AffineInfo) >> 2);
 		if(mCopyDone)
 		{
 			mCopyDone = false;
 			if(mUseVramB)
 			{
-				vramSetBankA(VRAM_A_MAIN_BG_0x06020000);
+				vramSetBankA(VRAM_A_LCD);
 				vramSetBankB(VRAM_B_MAIN_BG_0x06000000);
 			}
 			else
 			{
 				vramSetBankA(VRAM_A_MAIN_BG_0x06000000);
-				vramSetBankB(VRAM_B_MAIN_BG_0x06020000);
+				vramSetBankB(VRAM_B_LCD);
 			}
 			mUseVramB = !mUseVramB;
 		}
@@ -856,8 +624,9 @@ ITCM_CODE void VBlankProc()
 			mShouldCopyFrame = FALSE;
 			if(nrFramesInQueue > 0)
 			{
-				yuv2rgb_new(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], &BG_GFX[(128 * 1024) >> 1]);
-				DC_FlushRange((void*)&BG_GFX[(128 * 1024) >> 1], FRAME_SIZE * 2);
+				void* addr = mUseVramB ? VRAM_B : VRAM_A;
+				y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+				DC_FlushRange(addr, FRAME_SIZE * 2);
 				mCopyDone = true;
 			}
 			else
@@ -881,13 +650,16 @@ int main()
 	mStartVideoId = NULL;
 	isVideoPlaying = FALSE;
 	mUpscalingEnabled = FALSE;
-	fatInitDefault();
+	if(!fatInitDefault())
+		nitroFSInit(NULL);
 	//defaultExceptionHandler();
 	consoleDemoInit();
 	//if(nitroFSInit(NULL))
 	//	printf("NitroFS works\n");
 
 	soundEnable();
+
+	aac_setQueueArm7();
 	//make the bottom screen white and fade in a nice logo at the top screen
 	//setBrightness(1, 16);
 	//setBrightness(2, 16);
@@ -904,7 +676,8 @@ int main()
 	//vramSetBankE(VRAM_E_MAIN_BG);
 	vramSetBankA(VRAM_A_MAIN_BG);
 	//vramSetBankB(VRAM_B_MAIN_BG_0x06040000);
-	//vramSetBankC(VRAM_C_MAIN_BG_0x06060000);
+	vramSetBankD(VRAM_D_ARM7_0x06000000);
+	vramSetBankE(VRAM_E_LCD);
 	vramSetBankF(VRAM_F_MAIN_SPRITE_0x06400000);
 	vramSetBankG(VRAM_G_MAIN_SPRITE_0x06404000);
 	/*file = fopen("/Logo.nbfc", "rb");
@@ -971,7 +744,6 @@ int main()
 	//	else OAM_SUB[i] = 0;
 	//}
 	//BG_PALETTE_SUB[0] = RGB5(31,31,31);
-	mUIManager = new UIManager(NULL);
 	/*mToolbar = new Toolbar(RGB5(28,4,3), RGB5(31,31,31), RGB5(31,31,31), "YouTube", roboto_medium_13);
 	mToolbar->SetShowSearchButton(TRUE);
 	mToolbar->SetOnButtonClickCallback(OnToolbarButtonClick);
@@ -996,13 +768,9 @@ int main()
 		SPRITE_PALETTE_SUB[i + 1 + 64 + 16 + 16] = RGB5(rnew, gnew, bnew);
 	}
 	ProgressBar::InitializeVRAM();*/
-	mTestAdapter = NULL;
-	mList = NULL;
 	//mUIManager->AddSlice(mKeyboard);
 	//videoSetModeSub(MODE_0_2D);
 	//REG_DISPCNT_SUB |= DISPLAY_BG0_ACTIVE | DISPLAY_BG1_ACTIVE | DISPLAY_WIN0_ON | DISPLAY_WIN1_ON | DISPLAY_SPR_ACTIVE | DISPLAY_SPR_1D | DISPLAY_SPR_1D_SIZE_64;
-	mTextCursorBlinking = FALSE;
-	mTextCursorCounter = 0;
 	irqSet(IRQ_VBLANK, VBlankProc);
 	swiWaitForVBlank();
 	/*bright = 32;
