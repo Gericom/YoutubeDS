@@ -1,4 +1,6 @@
-@We'll use stride 256 to make it more suiteable for displaying on a ds
+#define FB_STRIDE			256
+#define FB_STRIDE_SHIFT		8
+#ifdef __ASSEMBLER__
 STRIDE = 256
 STRIDE_SHIFT = 8
 
@@ -15,6 +17,8 @@ STRIDE_SHIFT = 8
 @int16_t* pdc_coef_cache_y
 @int16_t* pdc_coef_cache_uv
 @int16_t* pvector_cache
+@mpeg4_block_dct_cache_entry* pdctCacheY
+@mpeg4_block_dct_cache_entry* pdctCacheUV
 @uint8_t vop_time_increment_bits
 @uint8_t vop_fcode_forward
 
@@ -30,5 +34,8 @@ mpeg4_dec_struct__pInterDCTVLCTable = (mpeg4_dec_struct__pIntraDCTVLCTable + 4)
 mpeg4_dec_struct__pdc_coef_cache_y = (mpeg4_dec_struct__pInterDCTVLCTable + 4)
 mpeg4_dec_struct__pdc_coef_cache_uv = (mpeg4_dec_struct__pdc_coef_cache_y + 4)
 mpeg4_dec_struct__pvector_cache = (mpeg4_dec_struct__pdc_coef_cache_uv + 4)
-mpeg4_dec_struct__vop_time_increment_bits = (mpeg4_dec_struct__pvector_cache + 4)
+mpeg4_dec_struct__pdctCacheY = (mpeg4_dec_struct__pvector_cache + 4)
+mpeg4_dec_struct__pdctCacheUV = (mpeg4_dec_struct__pdctCacheY + 4)
+mpeg4_dec_struct__vop_time_increment_bits = (mpeg4_dec_struct__pdctCacheUV + 4)
 mpeg4_dec_struct__vop_fcode_forward = (mpeg4_dec_struct__vop_time_increment_bits + 1)
+#endif

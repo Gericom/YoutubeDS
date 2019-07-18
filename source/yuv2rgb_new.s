@@ -1,4 +1,25 @@
 .section .itcm
+.include "mpeg4_header.s"
+
+DITHER_COEF_OFFSET = 0 //-4
+
+//DITHER_COEF_0 = (DITHER_COEF_OFFSET + 0)
+//DITHER_COEF_1 = (DITHER_COEF_OFFSET + 4)
+//DITHER_COEF_2 = (DITHER_COEF_OFFSET + 3)
+//DITHER_COEF_3 = (DITHER_COEF_OFFSET + 7)
+//DITHER_COEF_4 = (DITHER_COEF_OFFSET + 2)
+//DITHER_COEF_5 = (DITHER_COEF_OFFSET + 6)
+//DITHER_COEF_6 = (DITHER_COEF_OFFSET + 1)
+//DITHER_COEF_7 = (DITHER_COEF_OFFSET + 5)
+
+DITHER_COEF_0 = (DITHER_COEF_OFFSET + 0)
+DITHER_COEF_1 = (DITHER_COEF_OFFSET + 4)
+DITHER_COEF_2 = (DITHER_COEF_OFFSET + 6)
+DITHER_COEF_3 = (DITHER_COEF_OFFSET + 2)
+DITHER_COEF_4 = (DITHER_COEF_OFFSET + 1)
+DITHER_COEF_5 = (DITHER_COEF_OFFSET + 5)
+DITHER_COEF_6 = (DITHER_COEF_OFFSET + 7)
+DITHER_COEF_7 = (DITHER_COEF_OFFSET + 3)
 
 COEF_RV = 27525 //Add one V aswell //93061
 COEF_GU = -11272 //Mul by 2 //-22544
@@ -11,7 +32,9 @@ yuv2rgb_new:
 	ldr r10,= (YUV2RGB_ClampRangeBitTable + 256)
 	ldr lr,= (144*128)//(144*128)//(192 * 128)
 loop:
-	ldrh r9, [r1, #128]
+	add r1, #(STRIDE >> 1)
+	ldrh r9, [r1]//, #128]
+	sub r1, #(STRIDE >> 1)
 	ldrh r8, [r1], #2
 	orr r8, r8, r9, lsl #16
 	//Get U and V
@@ -33,6 +56,7 @@ loop:
 	ldr r3, [r0], #4
 	and r4, r3, #0xFF
 	add r12, r10, r4
+	add r12, #DITHER_COEF_0
 	ldrb r4, [r12, r5]
 	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
@@ -40,10 +64,10 @@ loop:
 	orr r4, r4, r12, lsl #10
 	orr r4, r4, #0x8000
 
-	mov r11, r3, lsr #8
-	and r11, r11, #0xFF
-	add r11, #5
-	add r12, r10, r11
+	mov r11, r3, lsl #16 //lsr #8
+	//and r11, r11, #0xFF
+	add r12, r10, r11, lsr #24
+	add r12, #DITHER_COEF_1
 	ldrb r9, [r12, r5]
 	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
@@ -53,9 +77,9 @@ loop:
 	orr r9, r4, r9, lsl #16
 	str r9, [r2], #4
 	//second line
-	ldr r9, [r0, #252]
+	ldr r9, [r0, #(STRIDE - 4)] //#252]
 	and r4, r9, #0xFF
-	add r4, #3
+	add r4, #DITHER_COEF_2
 	add r12, r10, r4
 	ldrb r4, [r12, r5]
 	ldrb r11, [r12, r6, lsl #1]
@@ -64,10 +88,10 @@ loop:
 	orr r4, r4, r12, lsl #10
 	orr r4, r4, #0x8000
 
-	mov r11, r9, lsr #8
-	and r11, r11, #0xFF
-	add r11, #8
-	add r12, r10, r11
+	mov r11, r9, lsl #16 //lsr #8
+	//and r11, r11, #0xFF
+	add r12, r10, r11, lsr #24
+	add r12, #DITHER_COEF_3
 	ldrb r5, [r12, r5]
 	ldrb r6, [r12, r6, lsl #1]
 	ldrb r7, [r12, r7]
@@ -96,10 +120,10 @@ loop:
 	smulwb r7, r8, r12
 	add r7, r8, r7, lsl #1
 
-	mov r11, r3, lsr #16
-	and r11, r11, #0xFF
-	add r11, #2
-	add r12, r10, r11
+	mov r11, r3, lsl #8 //lsr #16
+	//and r11, r11, #0xFF
+	add r12, r10, r11, lsr #24
+	add r12, #DITHER_COEF_4
 	ldrb r4, [r12, r5]
 	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
@@ -108,7 +132,7 @@ loop:
 	orr r4, r4, #0x8000
 
 	add r12, r10, r3, lsr #24
-	add r12, #7
+	add r12, #DITHER_COEF_5
 	ldrb r3, [r12, r5]
 	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
@@ -118,10 +142,10 @@ loop:
 	orr r3, r4, r3, lsl #16
 	str r3, [r2], #4
 	//second line
-	mov r11, r9, lsr #16
-	and r11, r11, #0xFF
-	add r11, #1
-	add r12, r10, r11
+	mov r11, r9, lsl #8 //lsr #16
+	//and r11, r11, #0xFF
+	add r12, r10, r11, lsr #24
+	add r12, #DITHER_COEF_6
 	ldrb r4, [r12, r5]
 	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
@@ -130,7 +154,7 @@ loop:
 	orr r4, r4, #0x8000
 
 	add r12, r10, r9, lsr #24
-	add r12, #6
+	add r12, #DITHER_COEF_7
 	ldrb r9, [r12, r5]
 	ldrb r11, [r12, r6, lsl #1]
 	ldrb r12, [r12, r7]
@@ -155,8 +179,8 @@ loop:
 	tst lr, #0xFF
 	bne loop
 
-	add r0, r0, #256
-	add r1, r1, #128
+	add r0, r0, #256 //#(STRIDE + 256) //#256
+	add r1, r1, #128 //#((STRIDE >> 1) + 128) //#128
 	add r2, r2, #352 //#192 //#352 //#512
 
 	b loop

@@ -1,5 +1,6 @@
 #include <nds.h>
 #include "mpeg4.h"
+#include "mpeg4_header.s"
 
 typedef uint8_t PIXEL;
 typedef uint32_t U32;
@@ -9,7 +10,7 @@ typedef uint32_t U32;
 
 #define LIMIT( low, x, high )    HX_MAX( low, HX_MIN( x, high ))
 
-extern "C" ITCM_CODE void limitMC( int hSize, int vSize, 
+static ITCM_CODE void limitMC( int hSize, int vSize, 
                     PIXEL const *in, PIXEL *out, int hdim,
                     int mvX, int mvY,   // Motion vector
                     int minX, int maxX, int minY, int maxY // Limits for hor/vert indices
@@ -51,7 +52,7 @@ extern "C" ITCM_CODE void limitMC( int hSize, int vSize,
         in += (intY + outsideTop) * hdim;	// Apply vert motion comp. (hor MC thru mapping)
     } else {    // Whole block is "outside" bottom of picture
         repeatBot = vSize;
-        in += (vSize - 1) * hdim;   // Point to last line of picture
+        in += /*(vSize - 1)*/maxY * hdim;   // Point to last line of picture
     }
 	// Output pointers
     outSave = out;						// Upper left corner of output block
@@ -168,20 +169,20 @@ extern "C" ITCM_CODE void limitMC( int hSize, int vSize,
     return;
 } 
 
-extern "C" ITCM_CODE void mpeg4_blockcopy_16x16_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
+extern "C" ITCM_CODE void __attribute__((noinline)) mpeg4_blockcopy_16x16_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
 {
-	limitMC(16, 16, context->pPrevY + r8, context->pDstY + r8, 256, dx, dy, 
-		-(r8 & 0xFF), context->width - 1 - (r8 & 0xFF), -(r8 >> 8), context->height - 1 - (r8 >> 8));//0, context->width, 0, context->height);
+	limitMC(16, 16, context->pPrevY + r8, context->pDstY + r8, FB_STRIDE, dx, dy, 
+		-(r8 & ((1 << FB_STRIDE_SHIFT) - 1)), context->width - 1 - (r8 & ((1 << FB_STRIDE_SHIFT) - 1)), -(r8 >> FB_STRIDE_SHIFT), context->height - 1 - (r8 >> FB_STRIDE_SHIFT));//0, context->width, 0, context->height);
 }
 
-extern "C" ITCM_CODE void mpeg4_blockcopy_8x8_Y_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
+extern "C" ITCM_CODE void __attribute__((noinline)) mpeg4_blockcopy_8x8_Y_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
 {
-	limitMC(8, 8, context->pPrevY + r8, context->pDstY + r8, 256, dx, dy, 
-		-(r8 & 0xFF), context->width - 1 - (r8 & 0xFF), -(r8 >> 8), context->height - 1 - (r8 >> 8));//0, context->width, 0, context->height);
+	limitMC(8, 8, context->pPrevY + r8, context->pDstY + r8, FB_STRIDE, dx, dy, 
+		-(r8 & ((1 << FB_STRIDE_SHIFT) - 1)), context->width - 1 - (r8 & ((1 << FB_STRIDE_SHIFT) - 1)), -(r8 >> FB_STRIDE_SHIFT), context->height - 1 - (r8 >> FB_STRIDE_SHIFT));//0, context->width, 0, context->height);
 }
 
-extern "C" ITCM_CODE void mpeg4_blockcopy_8x8_UV_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
+extern "C" ITCM_CODE void __attribute__((noinline)) mpeg4_blockcopy_8x8_UV_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
 {
-	limitMC(8, 8, context->pPrevUV + r8, context->pDstUV + r8, 256, dx, dy, 
-		-(r8 & 0x7F), (context->width >> 1) - 1 - (r8 & 0x7F), -(r8 >> 8), (context->height >> 1) - 1 - (r8 >> 8));//0, context->width, 0, context->height);
+	limitMC(8, 8, context->pPrevUV + r8, context->pDstUV + r8, FB_STRIDE, dx, dy, 
+		-(r8 & ((1 << (FB_STRIDE_SHIFT - 1)) - 1)), (context->width >> 1) - 1 - (r8 & ((1 << (FB_STRIDE_SHIFT - 1)) - 1)), -(r8 >> FB_STRIDE_SHIFT), (context->height >> 1) - 1 - (r8 >> FB_STRIDE_SHIFT));//0, context->width, 0, context->height);
 }

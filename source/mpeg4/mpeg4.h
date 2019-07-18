@@ -1,6 +1,13 @@
 #ifndef __MPEG4_H__
 #define __MPEG4_H__
 
+typedef struct
+{
+	uint32_t qscale;
+	uint16_t row0[7];//1-7
+	uint16_t col0[7];//1-7
+} mpeg4_block_dct_cache_entry;
+
 typedef struct PACKED
 {
 	uint8_t* pData;
@@ -15,6 +22,8 @@ typedef struct PACKED
 	int16_t* pdc_coef_cache_y;
 	int16_t* pdc_coef_cache_uv;
 	int16_t* pvector_cache;
+	mpeg4_block_dct_cache_entry* pdctCacheY;
+	mpeg4_block_dct_cache_entry* pdctCacheUV;
 	uint8_t vop_time_increment_bits;
 	uint8_t vop_fcode_forward;
 } mpeg4_dec_struct;

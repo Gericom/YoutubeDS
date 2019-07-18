@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <nds.h>
 #include <dswifi9.h>
 #include <sys/socket.h>
@@ -155,6 +156,11 @@ retry:
 					char lastsymbol = *((char*)pResponse);
 					pSrc++;
 					int mask = 0;
+					if(taglength2 == 1)//s
+					{
+						free(src);
+						return NULL;//this video requires signature decryption, which is currently not supported
+					}
 					if(taglength2 == 13)
 						mask |= 1;
 					else if(taglength2 == 4 && tagstart2[0] == 'i')

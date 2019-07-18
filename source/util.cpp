@@ -38,7 +38,7 @@ void Util_ConvertToObj(uint8_t* src, int width, int height, int stride, uint16_t
 	}
 }
 
-void Util_SetupStrideFixAffine(BG23AffineInfo* pAffineInfo, int srcStride, int dstStride, int xOffset, int yOffset, int xScale, int yScale)
+void Util_SetupStrideFixAffine(BG23AffineInfo* pAffineInfo, int srcStride, int dstStride, int xOffset, int yOffset, int xScale, int yScale, int xFrac)
 {
 	int startoffset = -yOffset * srcStride;
 	int x = startoffset & 0xFF;
@@ -55,16 +55,16 @@ void Util_SetupStrideFixAffine(BG23AffineInfo* pAffineInfo, int srcStride, int d
 		pAffineInfo[i].BG3PB = 0;
 		pAffineInfo[i].BG3PC = 0;
 		pAffineInfo[i].BG3PD = 256;
-		pAffineInfo[i].BG2X = x * 256 - xOffset * 256 + 128;
+		pAffineInfo[i].BG2X = x * 256 - xOffset * 256 + 128 + xFrac;
 		pAffineInfo[i].BG2Y = y * 256;
 		if(dstStride - x < srcStride)
 		{
-			pAffineInfo[i].BG3X = (x - dstStride) * 256 - xOffset * 256 + 128;
+			pAffineInfo[i].BG3X = (x - dstStride) * 256 - xOffset * 256 + 128 + xFrac;
 			pAffineInfo[i].BG3Y = (y + 1) * 256;
 		}
 		else
 		{
-			pAffineInfo[i].BG3X = x * 256 - xOffset * 256 + 128;
+			pAffineInfo[i].BG3X = x * 256 - xOffset * 256 + 128 + xFrac;
 			pAffineInfo[i].BG3Y = y * 256;
 		}
 		//some lines need to be repeated

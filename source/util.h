@@ -32,6 +32,6 @@ typedef struct
 	uint32_t BG3Y;
 } BG23AffineInfo;
 
-void Util_SetupStrideFixAffine(BG23AffineInfo* pAffineInfo, int srcStride, int dstStride, int xOffset, int yOffset, int xScale, int yScale);
+void Util_SetupStrideFixAffine(BG23AffineInfo* pAffineInfo, int srcStride, int dstStride, int xOffset, int yOffset, int xScale, int yScale, int xFrac);
 
 #endif

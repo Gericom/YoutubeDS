@@ -45,6 +45,7 @@
 
 #ifndef _AACCOMMON_H
 #define _AACCOMMON_H
+#include <nds.h>
 
 #include "aacdec.h"
 #include "statname.h"
