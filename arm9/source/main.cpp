@@ -625,7 +625,10 @@ ITCM_CODE void VBlankProc()
 			if(nrFramesInQueue > 0)
 			{
 				void* addr = mUseVramB ? VRAM_B : VRAM_A;
-				y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+				if(sVideoWidth == 256)
+					y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+				else
+					y2r_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
 				DC_FlushRange(addr, FRAME_SIZE * 2);
 				mCopyDone = true;
 			}

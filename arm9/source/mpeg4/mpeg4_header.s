@@ -38,4 +38,5 @@ mpeg4_dec_struct__pdctCacheY = (mpeg4_dec_struct__pvector_cache + 4)
 mpeg4_dec_struct__pdctCacheUV = (mpeg4_dec_struct__pdctCacheY + 4)
 mpeg4_dec_struct__vop_time_increment_bits = (mpeg4_dec_struct__pdctCacheUV + 4)
 mpeg4_dec_struct__vop_fcode_forward = (mpeg4_dec_struct__vop_time_increment_bits + 1)
+mpeg4_dec_struct__vop_rounding_control = (mpeg4_dec_struct__vop_fcode_forward + 1)
 #endif

@@ -104,11 +104,13 @@ mpeg4_blockcopy_16x16_copyloop2:
 	bne mpeg4_blockcopy_16x16_copyloop
 	pop {r1-r7,pc}
 
-mpeg4_blockcopy_16x16_halfs:
+mpeg4_blockcopy_16x16_halfs:	
+	ldrb lr, [r0, #mpeg4_dec_struct__vop_rounding_control]
 	cmp r4, #1
 	beq mpeg4_blockcopy_16x16_halfx
 	cmp r4, #2
 	beq mpeg4_blockcopy_16x16_halfy
+	rsb lr, lr, #2
 mpeg4_blockcopy_16x16_halfxy:
 .rept 16
 	ldrb r4, [r1], #1
@@ -118,7 +120,7 @@ mpeg4_blockcopy_16x16_halfxy:
 	add r4, r5
 	add r4, r6
 	add r4, r7
-	add r4, #2
+	add r4, lr //#2
 	mov r4, r4, lsr #2
 	strb r4, [r2], #1
 .endr
@@ -129,10 +131,12 @@ mpeg4_blockcopy_16x16_halfxy:
 	pop {r1-r7,pc}
 
 mpeg4_blockcopy_16x16_halfx:
+	rsb lr, lr, #1
+1:
 .rept 16
 	ldrb r4, [r1], #1
 	ldrb r5, [r1]	
-	add r4, #1
+	add r4, lr
 	add r4, r5
 	mov r4, r4, lsr #1
 	strb r4, [r2], #1
@@ -141,14 +145,16 @@ mpeg4_blockcopy_16x16_halfx:
 	add r1, #(STRIDE - 16)
 	add r2, #(STRIDE - 16)
 	subs r3, #1
-	bne mpeg4_blockcopy_16x16_halfx
+	bne 1b
 	pop {r1-r7,pc}
 
 mpeg4_blockcopy_16x16_halfy:
+	rsb lr, lr, #1
+1:
 .rept 16
 	ldrb r4, [r1], #1
 	ldrb r5, [r1, #(STRIDE - 1)]	
-	add r4, #1
+	add r4, lr
 	add r4, r5
 	mov r4, r4, lsr #1
 	strb r4, [r2], #1
@@ -156,7 +162,7 @@ mpeg4_blockcopy_16x16_halfy:
 	add r1, #(STRIDE - 16)
 	add r2, #(STRIDE - 16)
 	subs r3, #1
-	bne mpeg4_blockcopy_16x16_halfy
+	bne 1b
 	pop {r1-r7,pc}
 
 .global mpeg4_blockcopy_8x8_UV
@@ -281,10 +287,12 @@ mpeg4_blockcopy_8x8_copyloop2:
 	pop {r1-r7,pc}
 
 mpeg4_blockcopy_8x8_Y_halfs:
+	ldrb lr, [r0, #mpeg4_dec_struct__vop_rounding_control]
 	cmp r4, #1
 	beq mpeg4_blockcopy_8x8_Y_halfx
 	cmp r4, #2
 	beq mpeg4_blockcopy_8x8_Y_halfy
+	rsb lr, lr, #2
 mpeg4_blockcopy_8x8_Y_halfxy:
 .rept 8
 	ldrb r4, [r1], #1
@@ -305,31 +313,35 @@ mpeg4_blockcopy_8x8_Y_halfxy:
 	pop {r1-r7,pc}
 
 mpeg4_blockcopy_8x8_Y_halfx:
+	rsb lr, lr, #1
+1:
 .rept 8
 	ldrb r4, [r1], #1
 	ldrb r5, [r1]
 	add r4, r5
-	add r4, #1
+	add r4, lr
 	mov r4, r4, lsr #1
 	strb r4, [r2], #1
 .endr
 	add r1, #(STRIDE - 8)
 	add r2, #(STRIDE - 8)
 	subs r3, #1
-	bne mpeg4_blockcopy_8x8_Y_halfx
+	bne 1b
 	pop {r1-r7,pc}
 
 mpeg4_blockcopy_8x8_Y_halfy:
+	rsb lr, lr, #1
+1:
 .rept 8
 	ldrb r4, [r1], #1
 	ldrb r5, [r1, #(STRIDE - 1)]
 	add r4, r5
-	add r4, #1
+	add r4, lr
 	mov r4, r4, lsr #1
 	strb r4, [r2], #1
 .endr
 	add r1, #(STRIDE - 8)
 	add r2, #(STRIDE - 8)
 	subs r3, #1
-	bne mpeg4_blockcopy_8x8_Y_halfy
+	bne 1b
 	pop {r1-r7,pc}

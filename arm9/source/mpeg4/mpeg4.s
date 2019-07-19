@@ -36,6 +36,8 @@ mpeg4_VideoObjectPlane_modulo_time_base_loop:
 		blmi mpeg4_BitReader_FillBits
 
 	cmp r4, #1
+		mov r5, r3, lsr #31
+		strb r5, [r0, #mpeg4_dec_struct__vop_rounding_control]
 		addeq r3, r3	//vop_rounding_type, doesn't seem to be used yet
 		subeq r2, #1
 	mov r3, r3, lsl #3 //intra_dc_vlc_thr, not really used yet. Is it even used for simple profile???????
@@ -213,24 +215,24 @@ mpeg4_macroblock_notcoded_finish_copyloop_uv:
 
 mpeg4_macroblock:
 	push {lr}
-	push {r2,r3}
-	ldr lr, [r0, #mpeg4_dec_struct__pvector_cache]
-	//get x and y
-	mov r2, r8, lsr #STRIDE_SHIFT		//y
-	sub r3, r8, r2, lsl #STRIDE_SHIFT	//x
-	//divide by 8
-	mov r2, r2, lsr #3
-	mov r3, r3, lsr #3
-	//create new offset
-	add lr, r2, lsl #(STRIDE_SHIFT - 1)
-	add lr, r3, lsl #2
+	@ push {r2,r3}
+	@ ldr lr, [r0, #mpeg4_dec_struct__pvector_cache]
+	@ //get x and y
+	@ mov r2, r8, lsr #STRIDE_SHIFT		//y
+	@ sub r3, r8, r2, lsl #STRIDE_SHIFT	//x
+	@ //divide by 8
+	@ mov r2, r2, lsr #3
+	@ mov r3, r3, lsr #3
+	@ //create new offset
+	@ add lr, r2, lsl #(STRIDE_SHIFT - 1)
+	@ add lr, r3, lsl #2
 
-	ldr r2,= 0 //0x40004000
-	str r2, [lr]
-	str r2, [lr, #4]
-	str r2, [lr, #(STRIDE >> 1)]
-	str r2, [lr, #((STRIDE >> 1) + 4)]
-	pop {r2, r3}
+	@ ldr r2,= 0 //0x40004000
+	@ str r2, [lr]
+	@ str r2, [lr, #4]
+	@ str r2, [lr, #(STRIDE >> 1)]
+	@ str r2, [lr, #((STRIDE >> 1) + 4)]
+	@ pop {r2, r3}
 
 	cmp r2, #0
 		blmi mpeg4_BitReader_FillBits
@@ -1546,6 +1548,8 @@ mpeg4_block_read_dct:
 	//push {r5, r6, r9, r10, r11}	
 	ldr r4,= mpeg4_dct_tmp
 	movne r12, #0
+	mov r12, r12, lsl #16
+	mov r12, r12, lsr #16
 	str r12, [r4], #4 //store dc coef
 	mov r5, #0
 	mov r6, #0
@@ -1556,10 +1560,6 @@ mpeg4_block_read_dct:
 	mov r11, #0
 	mov r12, #0
 	stmia r4!, {r5-r11}
-	stmia r4!, {r5-r12}
-	stmia r4!, {r5-r12}
-	stmia r4!, {r5-r12}
-	stmia r4!, {r5-r12}
 	stmia r4!, {r5-r12}
 	stmia r4!, {r5-r12}
 	stmia r4!, {r5-r12}
@@ -1628,66 +1628,29 @@ mpeg4_block_read_dct_loop_cont2:
 		//add r8, r9
 		//str r8, [r12]
 		//str r8, [sp, r9, lsl #2]
-		str r8, [r12, r9, lsl #2]
+		add r12, r9, lsl #1
+		strh r8, [r12]
 		cmp r6, #1
 			bne mpeg4_block_read_dct_loop
 
 mpeg4_block_finish:
-	push {r0-r3}
-	ldr r0,= mpeg4_dct_tmp
-	bl mpeg4_idct
-	pop {r0-r3}
 	pop {r4, r5, r6, r7, r8, r9, r10}
-	//blit to the buffer
-	ldr lr,= mpeg4_dct_tmp
+	push {r0-r3}
+	ldr r2,= mpeg4_dct_tmp
 	cmp r10, #4
-		ldrlt r11, [r0, #mpeg4_dec_struct__pDstY]
-		ldrge r11, [r0, #mpeg4_dec_struct__pDstUV]
-	push {r9, r10}
-	add r11, r9
-	mov r12, #64
-mpeg4_block_finish_blitloop:
+		ldrlt r0, [r0, #mpeg4_dec_struct__pDstY]
+		ldrge r0, [r0, #mpeg4_dec_struct__pDstUV]
+	add r0, r9
+	mov r1, #STRIDE
+
 	cmp r7, #3
 	cmpne r7, #4
-		bne mpeg4_block_finish_blitloop_others
-
-mpeg4_block_finish_blitloop_34:
-	ldmia lr!, {r9, r10}
-
-	sub r12, #2
-	movs r9, r9, asr #6
-		movmi r9, #0
-	cmp r9, #255
-		movgt r9, #255
-
-	movs r10, r10, asr #6
-		movmi r10, #0
-	cmp r10, #255
-		movgt r10, #255
-
-	orr r9, r10, lsl #8
-	strh r9, [r11], #2
-
-	tst r12, #7
-		addeq r11, #(STRIDE - 8)
-	cmp r12, #0
-		bne mpeg4_block_finish_blitloop_34
-	pop {r9, r10, pc}
-
-mpeg4_block_finish_blitloop_others:
-	ldrb r10, [r11]
-	ldr r9, [lr], #4
-	sub r12, #1
-	adds r10, r9, asr #6
-		movmi r10, #0
-	cmp r10, #255
-		movgt r10, #255
-	strb r10, [r11], #1	
-	tst r12, #7
-		addeq r11, #(STRIDE - 8)
-	cmp r12, #0
-		bne mpeg4_block_finish_blitloop_others
-	pop {r9, r10, pc}
+	beq 1f
+	bl EXTERN_ASMff_simple_idct_add_armv5te
+	pop {r0-r3, pc}
+1:
+	bl EXTERN_ASMff_simple_idct_put_armv5te
+	pop {r0-r3, pc}
 
 mpeg4_block_decode_escape:
 	movs r3, r3, lsl #8

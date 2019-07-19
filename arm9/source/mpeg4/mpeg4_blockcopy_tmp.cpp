@@ -13,7 +13,8 @@ typedef uint32_t U32;
 static ITCM_CODE void limitMC( int hSize, int vSize, 
                     PIXEL const *in, PIXEL *out, int hdim,
                     int mvX, int mvY,   // Motion vector
-                    int minX, int maxX, int minY, int maxY // Limits for hor/vert indices
+                    int minX, int maxX, int minY, int maxY, // Limits for hor/vert indices
+                    int roundingControl
                     )
 {
 #define MAX_HSIZE   (16)
@@ -52,7 +53,7 @@ static ITCM_CODE void limitMC( int hSize, int vSize,
         in += (intY + outsideTop) * hdim;	// Apply vert motion comp. (hor MC thru mapping)
     } else {    // Whole block is "outside" bottom of picture
         repeatBot = vSize;
-        in += /*(vSize - 1)*/maxY * hdim;   // Point to last line of picture
+        in += /*(vSize - 1)*/(intY - 1) * hdim;   // Point to last line of picture
     }
 	// Output pointers
     outSave = out;						// Upper left corner of output block
@@ -83,10 +84,10 @@ static ITCM_CODE void limitMC( int hSize, int vSize,
             // Horizontal interpolation
             for (y = repeatTop; y < vSize - repeatBot; ++y) {
                 for (x = 0; x < hSize; x += 4) {
-                    out[x+0] = (in[mapX[x+0]] + in[mapX[x+1]] + 1) >> 1;
-                    out[x+1] = (in[mapX[x+1]] + in[mapX[x+2]] + 1) >> 1;
-                    out[x+2] = (in[mapX[x+2]] + in[mapX[x+3]] + 1) >> 1;
-                    out[x+3] = (in[mapX[x+3]] + in[mapX[x+4]] + 1) >> 1;
+                    out[x+0] = (in[mapX[x+0]] + in[mapX[x+1]] + 1 - roundingControl) >> 1;
+                    out[x+1] = (in[mapX[x+1]] + in[mapX[x+2]] + 1 - roundingControl) >> 1;
+                    out[x+2] = (in[mapX[x+2]] + in[mapX[x+3]] + 1 - roundingControl) >> 1;
+                    out[x+3] = (in[mapX[x+3]] + in[mapX[x+4]] + 1 - roundingControl) >> 1;
                 }
                 in += hdim;
                 out += hdim;
@@ -102,10 +103,10 @@ static ITCM_CODE void limitMC( int hSize, int vSize,
         }
         for (y = repeatTop; y < vSize - repeatBot; ++y) {
             for (x = 0; x < hSize; x += 4) {
-                out[x+0] = (in[mapX[x+0]] + in[mapX[x+0] + hdim] + 1) >> 1;
-                out[x+1] = (in[mapX[x+1]] + in[mapX[x+1] + hdim] + 1) >> 1;
-                out[x+2] = (in[mapX[x+2]] + in[mapX[x+2] + hdim] + 1) >> 1;
-                out[x+3] = (in[mapX[x+3]] + in[mapX[x+3] + hdim] + 1) >> 1;
+                out[x+0] = (in[mapX[x+0]] + in[mapX[x+0] + hdim] + 1 - roundingControl) >> 1;
+                out[x+1] = (in[mapX[x+1]] + in[mapX[x+1] + hdim] + 1 - roundingControl) >> 1;
+                out[x+2] = (in[mapX[x+2]] + in[mapX[x+2] + hdim] + 1 - roundingControl) >> 1;
+                out[x+3] = (in[mapX[x+3]] + in[mapX[x+3] + hdim] + 1 - roundingControl) >> 1;
             }
             in += hdim;
             out += hdim;
@@ -120,26 +121,26 @@ static ITCM_CODE void limitMC( int hSize, int vSize,
         if (repeatTop > 0) {    // Produce line to repeat
             outBegin = out - hdim;
             for (x = 0; x < hSize; ++x) {
-                outBegin[x] = (in[mapX[x]] + in[mapX[x+1]] + 1) >> 1;
+                outBegin[x] = (in[mapX[x]] + in[mapX[x+1]] + 1 - roundingControl) >> 1;
             }
         }
         for (y = repeatTop; y < vSize - repeatBot; ++y) {
             for (x = 0; x < hSize; x += 4) {
                     out[x+0] = (in[mapX[x+0]] + in[mapX[x+0] + hdim]
-                                + in[mapX[x+1]] + in[mapX[x+1] + hdim] + 2) >> 2;
+                                + in[mapX[x+1]] + in[mapX[x+1] + hdim] + 2 - roundingControl) >> 2;
                     out[x+1] = (in[mapX[x+1]] + in[mapX[x+1] + hdim]
-                                + in[mapX[x+2]] + in[mapX[x+2] + hdim] + 2) >> 2;
+                                + in[mapX[x+2]] + in[mapX[x+2] + hdim] + 2 - roundingControl) >> 2;
                     out[x+2] = (in[mapX[x+2]] + in[mapX[x+2] + hdim]
-                                + in[mapX[x+3]] + in[mapX[x+3] + hdim] + 2) >> 2;
+                                + in[mapX[x+3]] + in[mapX[x+3] + hdim] + 2 - roundingControl) >> 2;
                     out[x+3] = (in[mapX[x+3]] + in[mapX[x+3] + hdim]
-                                + in[mapX[x+4]] + in[mapX[x+4] + hdim] + 2) >> 2;
+                                + in[mapX[x+4]] + in[mapX[x+4] + hdim] + 2 - roundingControl) >> 2;
             }
             in += hdim;
             out += hdim;
         }
         if (repeatBot > 0) {    // Produce line to repeat
             for (x = 0; x < hSize; ++x) {
-                out[x] = (in[mapX[x]] + in[mapX[x+1]] + 1) >> 1;
+                out[x] = (in[mapX[x]] + in[mapX[x+1]] + 1 - roundingControl) >> 1;
             }
             out += hdim;
         }
@@ -172,17 +173,17 @@ static ITCM_CODE void limitMC( int hSize, int vSize,
 extern "C" ITCM_CODE void __attribute__((noinline)) mpeg4_blockcopy_16x16_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
 {
 	limitMC(16, 16, context->pPrevY + r8, context->pDstY + r8, FB_STRIDE, dx, dy, 
-		-(r8 & ((1 << FB_STRIDE_SHIFT) - 1)), context->width - 1 - (r8 & ((1 << FB_STRIDE_SHIFT) - 1)), -(r8 >> FB_STRIDE_SHIFT), context->height - 1 - (r8 >> FB_STRIDE_SHIFT));//0, context->width, 0, context->height);
+		-(r8 & ((1 << FB_STRIDE_SHIFT) - 1)), context->width - 1 - (r8 & ((1 << FB_STRIDE_SHIFT) - 1)), -(r8 >> FB_STRIDE_SHIFT), context->height - 1 - (r8 >> FB_STRIDE_SHIFT), context->vop_rounding_control);//0, context->width, 0, context->height);
 }
 
 extern "C" ITCM_CODE void __attribute__((noinline)) mpeg4_blockcopy_8x8_Y_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
 {
 	limitMC(8, 8, context->pPrevY + r8, context->pDstY + r8, FB_STRIDE, dx, dy, 
-		-(r8 & ((1 << FB_STRIDE_SHIFT) - 1)), context->width - 1 - (r8 & ((1 << FB_STRIDE_SHIFT) - 1)), -(r8 >> FB_STRIDE_SHIFT), context->height - 1 - (r8 >> FB_STRIDE_SHIFT));//0, context->width, 0, context->height);
+		-(r8 & ((1 << FB_STRIDE_SHIFT) - 1)), context->width - 1 - (r8 & ((1 << FB_STRIDE_SHIFT) - 1)), -(r8 >> FB_STRIDE_SHIFT), context->height - 1 - (r8 >> FB_STRIDE_SHIFT), context->vop_rounding_control);//0, context->width, 0, context->height);
 }
 
 extern "C" ITCM_CODE void __attribute__((noinline)) mpeg4_blockcopy_8x8_UV_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
 {
 	limitMC(8, 8, context->pPrevUV + r8, context->pDstUV + r8, FB_STRIDE, dx, dy, 
-		-(r8 & ((1 << (FB_STRIDE_SHIFT - 1)) - 1)), (context->width >> 1) - 1 - (r8 & ((1 << (FB_STRIDE_SHIFT - 1)) - 1)), -(r8 >> FB_STRIDE_SHIFT), (context->height >> 1) - 1 - (r8 >> FB_STRIDE_SHIFT));//0, context->width, 0, context->height);
+		-(r8 & ((1 << (FB_STRIDE_SHIFT - 1)) - 1)), (context->width >> 1) - 1 - (r8 & ((1 << (FB_STRIDE_SHIFT - 1)) - 1)), -(r8 >> FB_STRIDE_SHIFT), (context->height >> 1) - 1 - (r8 >> FB_STRIDE_SHIFT), context->vop_rounding_control);//0, context->width, 0, context->height);
 }

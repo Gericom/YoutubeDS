@@ -26,6 +26,7 @@ typedef struct PACKED
 	mpeg4_block_dct_cache_entry* pdctCacheUV;
 	uint8_t vop_time_increment_bits;
 	uint8_t vop_fcode_forward;
+	uint8_t vop_rounding_control;
 } mpeg4_dec_struct;
 
 extern "C" void mpeg4_VideoObjectPlane(mpeg4_dec_struct* pInfo);
