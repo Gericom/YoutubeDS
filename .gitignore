@@ -86,3 +86,4 @@ line.bat
 *.elf
 source/youtube_apikey.cpp
 YoutubeDS.nds
+*.mp4

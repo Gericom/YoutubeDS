@@ -326,6 +326,9 @@ ITCM_CODE void PlayVideo()
 	videoSetMode(MODE_5_2D);
 	//vramSetBankE(VRAM_E_MAIN_BG);
 	dmaFillWords(0, (void*)0x06000000, 256 * 192 * 2);
+	vramSetBankC(VRAM_C_LCD);
+	dmaFillWords(0x80008000, (void*)VRAM_C, 256 * 144 * 2);
+	vramSetBankC(VRAM_C_MAIN_BG_0x06000000);
 	bgInit(2, BgType_Bmp8, BgSize_B16_256x256, 0,0);
 	bgInit(3, BgType_Bmp8, BgSize_B16_256x256, 0,0);
 	REG_DISPCNT &= ~(DISPLAY_BG0_ACTIVE | DISPLAY_BG1_ACTIVE | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
@@ -626,9 +629,13 @@ ITCM_CODE void VBlankProc()
 			{
 				void* addr = mUseVramB ? VRAM_B : VRAM_A;
 				if(sVideoWidth == 256)
-					y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+					yog2rgb_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
 				else
-					y2r_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+					yog2rgb_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+				//if(sVideoWidth == 256)
+				//	y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+				//else
+				//	y2r_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
 				DC_FlushRange(addr, FRAME_SIZE * 2);
 				mCopyDone = true;
 			}
@@ -656,7 +663,11 @@ int main()
 	if(!fatInitDefault())
 		nitroFSInit(NULL);
 	//defaultExceptionHandler();
-	consoleDemoInit();
+	//consoleDemoInit();
+	videoSetModeSub(MODE_0_2D);
+	vramSetBankH(VRAM_H_SUB_BG);
+
+	consoleInit(NULL, 0, BgType_Text4bpp, BgSize_T_256x256, 2, 0, false, true);
 	//if(nitroFSInit(NULL))
 	//	printf("NitroFS works\n");
 
@@ -666,7 +677,7 @@ int main()
 	//make the bottom screen white and fade in a nice logo at the top screen
 	//setBrightness(1, 16);
 	//setBrightness(2, 16);
-	videoSetMode(MODE_0_2D);
+	//videoSetMode(MODE_0_2D);
 	//uint8_t* load_tmp = (uint8_t*)malloc(6080);
 	//FILE* file = fopen("/Logo.nbfp", "rb");
 	//fread(&load_tmp[0], 1, 512, file);
@@ -683,6 +694,7 @@ int main()
 	vramSetBankE(VRAM_E_LCD);
 	vramSetBankF(VRAM_F_MAIN_SPRITE_0x06400000);
 	vramSetBankG(VRAM_G_MAIN_SPRITE_0x06404000);
+
 	/*file = fopen("/Logo.nbfc", "rb");
 	fread(&load_tmp[0], 1, 6080, file);
 	fclose(file);
