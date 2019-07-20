@@ -29,6 +29,7 @@
 #include "mpeg4/mpeg4_header.s"
 #include "aacShared.h"
 #include "lock.h"
+#include "fileBrowse.h"
 
 #define AAC_ARM7
 
@@ -191,7 +192,11 @@ ITCM_CODE void PlayVideo()
 	mVideoHeader = (uint8_t*)malloc(SWAP_CONSTANT_32(header_size));
 	mRingBufferHttpStream->Read(mVideoHeader + 4, SWAP_CONSTANT_32(header_size) - 4);
 #else
-	FILE* video = fopen("/video.mp4", "rb");
+	FILE* video = fopen(browseForFile().c_str(), "rb");
+
+	// Clear the screen
+	iprintf ("\x1b[2J");
+
 	printf("Opened file: %p\n", video);
 	//find the moov atom
 	while(true)
@@ -670,6 +675,7 @@ int main()
 	consoleInit(NULL, 0, BgType_Text4bpp, BgSize_T_256x256, 2, 0, false, true);
 	//if(nitroFSInit(NULL))
 	//	printf("NitroFS works\n");
+	keysSetRepeat(25, 5);
 
 	soundEnable();
 
