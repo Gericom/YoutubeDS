@@ -161,6 +161,7 @@ static void aac_initQueue()
 {
 	memset(&sAACQueue, 0, sizeof(sAACQueue));
 	sAACQueueUncached = (aac_queue_t*)memUncached(&sAACQueue);
+	DC_FlushRange(&sAACQueue, (sizeof(sAACQueue) + 31) & ~31);
 }
 
 ITCM_CODE void PlayVideo()
@@ -205,8 +206,8 @@ ITCM_CODE void PlayVideo()
 		u32 atom;
 		fread(&size, 4, 1, video);
 		fread(&atom, 4, 1, video);
-		printf("size: %x\n", SWAP_CONSTANT_32(size));
-		printf("atom: %x\n", SWAP_CONSTANT_32(atom));
+		printf("size: %lx\n", SWAP_CONSTANT_32(size));
+		printf("atom: %lx\n", SWAP_CONSTANT_32(atom));
 		if(atom == 0x766F6F6D)
 		{
 			fseek(video, -8, SEEK_CUR);			
@@ -235,16 +236,16 @@ ITCM_CODE void PlayVideo()
 	//find the header data we need
 	uint8_t* pHeader = mVideoHeader;
 	u32 moovSize = READ_SAFE_UINT32_BE(pHeader);	
-	printf("moovSize: %x\n", moovSize);
+	printf("moovSize: %lx\n", moovSize);
 	uint8_t* pHeaderEnd = pHeader + moovSize;
 	pHeader += 8;	//skip moov header
 
-	uint32_t timescale;
-	uint8_t* framesizes;
-	uint8_t* videoBlockOffsets;
-	int nrframes;
-	uint8_t* audioBlockOffsets;
-	int audioRate;
+	uint32_t timescale = 0;
+	uint8_t* framesizes = 0;
+	uint8_t* videoBlockOffsets = 0;
+	int nrframes = 0;
+	uint8_t* audioBlockOffsets = 0;
+	int audioRate = 0;
 	//parse atoms
 	while(pHeader < pHeaderEnd)
 	{
@@ -454,11 +455,11 @@ ITCM_CODE void PlayVideo()
 		mpeg4DecStruct.pPrevUV = mpeg4DecStruct.pDstUV;
 		mpeg4DecStruct.pDstY = &mYBuffer[lastQueueBlock][0];
 		mpeg4DecStruct.pDstUV = &mUVBuffer[lastQueueBlock][0];
-		for(int q = 0; q < sizeof(mYDCCoefCache) / sizeof(mYDCCoefCache[0]); q++)
+		for(uint q = 0; q < sizeof(mYDCCoefCache) / sizeof(mYDCCoefCache[0]); q++)
 			mYDCCoefCache[q] = 1024;
-		for(int q = 0; q < sizeof(mUVDCCoefCache) / sizeof(mUVDCCoefCache[0]); q++)
+		for(uint q = 0; q < sizeof(mUVDCCoefCache) / sizeof(mUVDCCoefCache[0]); q++)
 			mUVDCCoefCache[q] = 1024;
-		for(int q = 0; q < sizeof(mMVecCache) / sizeof(mMVecCache[0]); q++)
+		for(uint q = 0; q < sizeof(mMVecCache) / sizeof(mMVecCache[0]); q++)
 			mMVecCache[q] = 0;
 		if(mpeg4DecStruct.pData[2] == 1 && mpeg4DecStruct.pData[3] == 0xB3)
 			mpeg4DecStruct.pData += 7;
@@ -653,6 +654,9 @@ ITCM_CODE void VBlankProc()
 			firstQueueBlock = (firstQueueBlock + 1) % NR_FRAME_BLOCKS;
 			nrFramesInQueue--;
 		}
+
+		scanKeys();
+		if(keysDown() & KEY_B)	stopVideo = true;
 	}
 	else
 		mKeyTimer = 0;

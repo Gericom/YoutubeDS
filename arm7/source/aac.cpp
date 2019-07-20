@@ -90,6 +90,7 @@ void aac_reset()
         sAACInitialized = false;
     }
     sNextAudioBlock = 0;
+    sAudioBlockCount = 0;
     sAudioStarted = false;
     sAACInitialized = false;
 }
