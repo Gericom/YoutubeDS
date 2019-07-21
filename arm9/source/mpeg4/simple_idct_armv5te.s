@@ -82,7 +82,7 @@ ELF     .eabi_attribute 10, 0           @ suppress Tag_FP_arch
         .syntax unified
 T       .thumb
 ELF     .eabi_attribute 25, 1           @ Tag_ABI_align_preserved
-ELF     .section .note.GNU-stack,"",%progbits @ Mark stack as non-executable
+//ELF     .section .note.GNU-stack,"",%progbits @ Mark stack as non-executable
 
 .macro  function name, export=0, align=2
         .set            .Lpic_idx, 0
@@ -101,7 +101,7 @@ ELF     .section .note.GNU-stack,"",%progbits @ Mark stack as non-executable
 FUNC    .endfunc
         .purgem endfunc
     .endm
-        .text
+        //.text
         .align          \align
     .if \export
         .global EXTERN_ASM\name
@@ -595,85 +595,85 @@ endfunc
         sub    r11, r11, r3
         .endm
 
-function idct_col_armv5te
-        str    lr, [sp, #-4]!
+@ function idct_col_armv5te
+@         str    lr, [sp, #-4]!
 
-        idct_col
+@         idct_col
 
-        ldmfd  sp!, {r2, r3}
-        adds   r1, r2, r4
-        mov    r1, r1, lsr #20
-        it     mi
-        orrmi  r1, r1, #0xf000
-        add    r12, r3, r5
-        mov    r12, r12, asr #20
-        orr    r1, r1, r12, lsl #16
-        str    r1, [r0]
-        subs   r2, r2, r4
-        mov    r1, r2, lsr #20
-        it     mi
-        orrmi  r1, r1, #0xf000
-        sub    r3, r3, r5
-        mov    r3, r3, asr #20
-        orr    r1, r1, r3, lsl #16
-        ldmfd  sp!, {r2, r3}
-        str    r1, [r0, #(16*7)]
+@         ldmfd  sp!, {r2, r3}
+@         adds   r1, r2, r4
+@         mov    r1, r1, lsr #20
+@         it     mi
+@         orrmi  r1, r1, #0xf000
+@         add    r12, r3, r5
+@         mov    r12, r12, asr #20
+@         orr    r1, r1, r12, lsl #16
+@         str    r1, [r0]
+@         subs   r2, r2, r4
+@         mov    r1, r2, lsr #20
+@         it     mi
+@         orrmi  r1, r1, #0xf000
+@         sub    r3, r3, r5
+@         mov    r3, r3, asr #20
+@         orr    r1, r1, r3, lsl #16
+@         ldmfd  sp!, {r2, r3}
+@         str    r1, [r0, #(16*7)]
 
-        subs   r1, r2, r6
-        mov    r1, r1, lsr #20
-        it     mi
-        orrmi  r1, r1, #0xf000
-        sub    r12, r3, r7
-        mov    r12, r12, asr #20
-        orr    r1, r1, r12, lsl #16
-        str    r1, [r0, #(16*1)]
-        adds   r2, r2, r6
-        mov    r1, r2, lsr #20
-        it     mi
-        orrmi  r1, r1, #0xf000
-        add    r3, r3, r7
-        mov    r3, r3, asr #20
-        orr    r1, r1, r3, lsl #16
-        ldmfd  sp!, {r2, r3}
-        str    r1, [r0, #(16*6)]
+@         subs   r1, r2, r6
+@         mov    r1, r1, lsr #20
+@         it     mi
+@         orrmi  r1, r1, #0xf000
+@         sub    r12, r3, r7
+@         mov    r12, r12, asr #20
+@         orr    r1, r1, r12, lsl #16
+@         str    r1, [r0, #(16*1)]
+@         adds   r2, r2, r6
+@         mov    r1, r2, lsr #20
+@         it     mi
+@         orrmi  r1, r1, #0xf000
+@         add    r3, r3, r7
+@         mov    r3, r3, asr #20
+@         orr    r1, r1, r3, lsl #16
+@         ldmfd  sp!, {r2, r3}
+@         str    r1, [r0, #(16*6)]
 
-        adds   r1, r2, r8
-        mov    r1, r1, lsr #20
-        it     mi
-        orrmi  r1, r1, #0xf000
-        add    r12, r3, r9
-        mov    r12, r12, asr #20
-        orr    r1, r1, r12, lsl #16
-        str    r1, [r0, #(16*2)]
-        subs   r2, r2, r8
-        mov    r1, r2, lsr #20
-        it     mi
-        orrmi  r1, r1, #0xf000
-        sub    r3, r3, r9
-        mov    r3, r3, asr #20
-        orr    r1, r1, r3, lsl #16
-        ldmfd  sp!, {r2, r3}
-        str    r1, [r0, #(16*5)]
+@         adds   r1, r2, r8
+@         mov    r1, r1, lsr #20
+@         it     mi
+@         orrmi  r1, r1, #0xf000
+@         add    r12, r3, r9
+@         mov    r12, r12, asr #20
+@         orr    r1, r1, r12, lsl #16
+@         str    r1, [r0, #(16*2)]
+@         subs   r2, r2, r8
+@         mov    r1, r2, lsr #20
+@         it     mi
+@         orrmi  r1, r1, #0xf000
+@         sub    r3, r3, r9
+@         mov    r3, r3, asr #20
+@         orr    r1, r1, r3, lsl #16
+@         ldmfd  sp!, {r2, r3}
+@         str    r1, [r0, #(16*5)]
 
-        adds   r1, r2, r10
-        mov    r1, r1, lsr #20
-        it     mi
-        orrmi  r1, r1, #0xf000
-        add    r12, r3, r11
-        mov    r12, r12, asr #20
-        orr    r1, r1, r12, lsl #16
-        str    r1, [r0, #(16*3)]
-        subs   r2, r2, r10
-        mov    r1, r2, lsr #20
-        it     mi
-        orrmi  r1, r1, #0xf000
-        sub    r3, r3, r11
-        mov    r3, r3, asr #20
-        orr    r1, r1, r3, lsl #16
-        str    r1, [r0, #(16*4)]
+@         adds   r1, r2, r10
+@         mov    r1, r1, lsr #20
+@         it     mi
+@         orrmi  r1, r1, #0xf000
+@         add    r12, r3, r11
+@         mov    r12, r12, asr #20
+@         orr    r1, r1, r12, lsl #16
+@         str    r1, [r0, #(16*3)]
+@         subs   r2, r2, r10
+@         mov    r1, r2, lsr #20
+@         it     mi
+@         orrmi  r1, r1, #0xf000
+@         sub    r3, r3, r11
+@         mov    r3, r3, asr #20
+@         orr    r1, r1, r3, lsl #16
+@         str    r1, [r0, #(16*4)]
 
-        ldr    pc, [sp], #4
-endfunc
+@         ldr    pc, [sp], #4
+@ endfunc
 
 .macro  clip   dst, src:vararg
         movs   \dst, \src
@@ -684,6 +684,12 @@ endfunc
         movgt  \dst, #255
 .endm
 
+.macro  clip_new   dst, src:vararg
+        mov   \dst, \src
+        ands r7, \dst, #0xFFFFFF00
+                bicne \dst, r6, \dst, asr #32
+.endm
+
 .macro  aclip  dst, src:vararg
         adds   \dst, \src
         it     mi
@@ -691,6 +697,12 @@ endfunc
         cmp    \dst, #255
         it     gt
         movgt  \dst, #255
+.endm
+
+.macro  aclip_new  dst, src:vararg
+        add   \dst, \src
+        ands r0, \dst, #0xFFFFFF00
+                bicne \dst, r7, \dst, asr #32
 .endm
 
 function idct_col_put_armv5te
@@ -708,8 +720,8 @@ function idct_col_put_armv5te
         sub    r2, r2, r4
         clip   r2, r2, asr #20
         sub    r3, r3, r5
-        clip   r3, r3, asr #20
         ldr    r4, [sp, #28]
+        clip   r3, r3, asr #20
         strh   r1, [r4]
         add    r1, r4, #2
         str    r1, [sp, #28]
@@ -719,43 +731,50 @@ function idct_col_put_armv5te
         strh_pre r1, r5, r4
 
         sub    r1, r2, r6
-        clip   r1, r1, asr #20
+        add    r2, r2, r6
         sub    r12, r3, r7
-        clip   r12, r12, asr #20
+        add    r3, r3, r7
+
+        mov r6, #0xFF //clipping masker, and r7 will be used as scratch
+
+        clip_new   r1, r1, asr #20
+
+        clip_new   r12, r12, asr #20
         orr    r1, r1, r12, lsl #8
         strh_pre r1, r4, lr
-        add    r2, r2, r6
-        clip   r1, r2, asr #20
-        add    r3, r3, r7
-        clip   r3, r3, asr #20
+
+
+        clip_new   r1, r2, asr #20
+
+        clip_new   r3, r3, asr #20
         orr    r1, r1, r3, lsl #8
         ldmfd  sp!, {r2, r3}
         strh_dpre r1, r5, lr
 
         add    r1, r2, r8
-        clip   r1, r1, asr #20
+        clip_new   r1, r1, asr #20
         add    r12, r3, r9
-        clip   r12, r12, asr #20
+        clip_new   r12, r12, asr #20
         orr    r1, r1, r12, lsl #8
         strh_pre r1, r4, lr
         sub    r2, r2, r8
-        clip   r1, r2, asr #20
+        clip_new   r1, r2, asr #20
         sub    r3, r3, r9
-        clip   r3, r3, asr #20
+        clip_new   r3, r3, asr #20
         orr    r1, r1, r3, lsl #8
         ldmfd  sp!, {r2, r3}
         strh_dpre r1, r5, lr
 
         add    r1, r2, r10
-        clip   r1, r1, asr #20
+        clip_new   r1, r1, asr #20
         add    r12, r3, r11
-        clip   r12, r12, asr #20
+        clip_new   r12, r12, asr #20
         orr    r1, r1, r12, lsl #8
         strh   r1, [r4, lr]
         sub    r2, r2, r10
-        clip   r1, r2, asr #20
+        clip_new   r1, r2, asr #20
         sub    r3, r3, r11
-        clip   r3, r3, asr #20
+        clip_new   r3, r3, asr #20
         orr    r1, r1, r3, lsl #8
         strh_dpre r1, r5, lr
 
@@ -763,11 +782,12 @@ function idct_col_put_armv5te
 endfunc
 
 function idct_col_add_armv5te
-        str    lr, [sp, #-4]!
+        push {r0, lr}
+        //str    lr, [sp, #-4]!
 
         idct_col
 
-        ldr    lr, [sp, #36]
+        ldr    lr, [sp, #40]
 
         ldmfd  sp!, {r2, r3}
         ldrh   r12, [lr]
@@ -779,7 +799,7 @@ function idct_col_add_armv5te
         mov    r4, r4, asr #20
         aclip  r4, r4, r12, lsr #8
         orr    r1, r1, r4, lsl #8
-        ldr    r4, [sp, #32]
+        ldr    r4, [sp, #36]
         sub    r3, r3, r5
         rsb    r5, r4, r4, lsl #3
         ldrh_pre r12, r5, lr
@@ -789,7 +809,7 @@ function idct_col_add_armv5te
         mov    r3, r3, asr #20
         aclip  r3, r3, r12, lsr #8
         add    r1, lr, #2
-        str    r1, [sp, #28]
+        str    r1, [sp, #32]
         orr    r1, r2, r3, lsl #8
         strh   r1, [r5]
 
@@ -799,17 +819,20 @@ function idct_col_add_armv5te
         add    r2, r2, r6
         and    r6, r12, #255
         aclip  r1, r6, r1, asr #20
-        sub    r6, r3, r7
-        mov    r6, r6, asr #20
-        aclip  r6, r6, r12, lsr #8
-        orr    r1, r1, r6, lsl #8
+        sub    r6, r3, r7        
         add    r3, r3, r7
+
+        mov r7, #0xFF //clipping masker, and r0 will be used as scratch
+
+        mov    r6, r6, asr #20
+        aclip_new  r6, r6, r12, lsr #8
+        orr    r1, r1, r6, lsl #8
         ldrh_dpre r12, r5, r4
         strh   r1, [lr]
         and    r1, r12, #255
-        aclip  r2, r1, r2, asr #20
+        aclip_new  r2, r1, r2, asr #20
         mov    r3, r3, asr #20
-        aclip  r3, r3, r12, lsr #8
+        aclip_new  r3, r3, r12, lsr #8
         orr    r1, r2, r3, lsl #8
         strh   r1, [r5]
 
@@ -818,18 +841,18 @@ function idct_col_add_armv5te
         add    r1, r2, r8
         sub    r2, r2, r8
         and    r6, r12, #255
-        aclip  r1, r6, r1, asr #20
+        aclip_new  r1, r6, r1, asr #20
         add    r6, r3, r9
         mov    r6, r6, asr #20
-        aclip  r6, r6, r12, lsr #8
+        aclip_new  r6, r6, r12, lsr #8
         orr    r1, r1, r6, lsl #8
         sub    r3, r3, r9
         ldrh_dpre r12, r5, r4
         strh   r1, [lr]
         and    r1, r12, #255
-        aclip  r2, r1, r2, asr #20
+        aclip_new  r2, r1, r2, asr #20
         mov    r3, r3, asr #20
-        aclip  r3, r3, r12, lsr #8
+        aclip_new  r3, r3, r12, lsr #8
         orr    r1, r2, r3, lsl #8
         strh   r1, [r5]
 
@@ -838,55 +861,56 @@ function idct_col_add_armv5te
         add    r1, r2, r10
         sub    r2, r2, r10
         and    r6, r12, #255
-        aclip  r1, r6, r1, asr #20
+        aclip_new  r1, r6, r1, asr #20
         add    r6, r3, r11
         mov    r6, r6, asr #20
-        aclip  r6, r6, r12, lsr #8
+        aclip_new  r6, r6, r12, lsr #8
         orr    r1, r1, r6, lsl #8
         sub    r3, r3, r11
         ldrh_dpre r12, r5, r4
         strh   r1, [lr]
         and    r1, r12, #255
-        aclip  r2, r1, r2, asr #20
+        aclip_new  r2, r1, r2, asr #20
         mov    r3, r3, asr #20
-        aclip  r3, r3, r12, lsr #8
+        aclip_new  r3, r3, r12, lsr #8
         orr    r1, r2, r3, lsl #8
         strh   r1, [r5]
 
-        ldr    pc, [sp], #4
+        pop {r0, pc}
+        //ldr    pc, [sp], #4
 endfunc
 
-function ff_simple_idct_armv5te, export=1
-        stmfd  sp!, {r4, r5, r6, r7, r8, r9, r10, r11, lr}
+@ function ff_simple_idct_armv5te, export=1
+@         stmfd  sp!, {r4, r5, r6, r7, r8, r9, r10, r11, lr}
 
-        bl     idct_row_armv5te
-        add    r0, r0, #16
-        bl     idct_row_armv5te
-        add    r0, r0, #16
-        bl     idct_row_armv5te
-        add    r0, r0, #16
-        bl     idct_row_armv5te
-        add    r0, r0, #16
-        bl     idct_row_armv5te
-        add    r0, r0, #16
-        bl     idct_row_armv5te
-        add    r0, r0, #16
-        bl     idct_row_armv5te
-        add    r0, r0, #16
-        bl     idct_row_armv5te
+@         bl     idct_row_armv5te
+@         add    r0, r0, #16
+@         bl     idct_row_armv5te
+@         add    r0, r0, #16
+@         bl     idct_row_armv5te
+@         add    r0, r0, #16
+@         bl     idct_row_armv5te
+@         add    r0, r0, #16
+@         bl     idct_row_armv5te
+@         add    r0, r0, #16
+@         bl     idct_row_armv5te
+@         add    r0, r0, #16
+@         bl     idct_row_armv5te
+@         add    r0, r0, #16
+@         bl     idct_row_armv5te
 
-        sub    r0, r0, #(16*7)
+@         sub    r0, r0, #(16*7)
 
-        bl     idct_col_armv5te
-        add    r0, r0, #4
-        bl     idct_col_armv5te
-        add    r0, r0, #4
-        bl     idct_col_armv5te
-        add    r0, r0, #4
-        bl     idct_col_armv5te
+@         bl     idct_col_armv5te
+@         add    r0, r0, #4
+@         bl     idct_col_armv5te
+@         add    r0, r0, #4
+@         bl     idct_col_armv5te
+@         add    r0, r0, #4
+@         bl     idct_col_armv5te
 
-        ldmfd  sp!, {r4, r5, r6, r7, r8, r9, r10, r11, pc}
-endfunc
+@         ldmfd  sp!, {r4, r5, r6, r7, r8, r9, r10, r11, pc}
+@ endfunc
 
 function ff_simple_idct_add_armv5te, export=1
         stmfd  sp!, {r0, r1, r4, r5, r6, r7, r8, r9, r10, r11, lr}

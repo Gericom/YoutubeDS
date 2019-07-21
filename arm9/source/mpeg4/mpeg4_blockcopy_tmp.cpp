@@ -170,19 +170,19 @@ static ITCM_CODE void limitMC( int hSize, int vSize,
     return;
 } 
 
-extern "C" ITCM_CODE void __attribute__((noinline)) mpeg4_blockcopy_16x16_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
+extern "C" ITCM_CODE void __attribute__((noinline)) __attribute__((optimize("-O1"))) mpeg4_blockcopy_16x16_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
 {
 	limitMC(16, 16, context->pPrevY + r8, context->pDstY + r8, FB_STRIDE, dx, dy, 
 		-(r8 & ((1 << FB_STRIDE_SHIFT) - 1)), context->width - 1 - (r8 & ((1 << FB_STRIDE_SHIFT) - 1)), -(r8 >> FB_STRIDE_SHIFT), context->height - 1 - (r8 >> FB_STRIDE_SHIFT), context->vop_rounding_control);//0, context->width, 0, context->height);
 }
 
-extern "C" ITCM_CODE void __attribute__((noinline)) mpeg4_blockcopy_8x8_Y_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
+extern "C" ITCM_CODE void __attribute__((noinline)) __attribute__((optimize("-O1"))) mpeg4_blockcopy_8x8_Y_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
 {
 	limitMC(8, 8, context->pPrevY + r8, context->pDstY + r8, FB_STRIDE, dx, dy, 
 		-(r8 & ((1 << FB_STRIDE_SHIFT) - 1)), context->width - 1 - (r8 & ((1 << FB_STRIDE_SHIFT) - 1)), -(r8 >> FB_STRIDE_SHIFT), context->height - 1 - (r8 >> FB_STRIDE_SHIFT), context->vop_rounding_control);//0, context->width, 0, context->height);
 }
 
-extern "C" ITCM_CODE void __attribute__((noinline)) mpeg4_blockcopy_8x8_UV_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
+extern "C" ITCM_CODE void __attribute__((noinline)) __attribute__((optimize("-O1"))) mpeg4_blockcopy_8x8_UV_tmp(mpeg4_dec_struct* context, uint32_t r8, int dx, int dy)
 {
 	limitMC(8, 8, context->pPrevUV + r8, context->pDstUV + r8, FB_STRIDE, dx, dy, 
 		-(r8 & ((1 << (FB_STRIDE_SHIFT - 1)) - 1)), (context->width >> 1) - 1 - (r8 & ((1 << (FB_STRIDE_SHIFT - 1)) - 1)), -(r8 >> FB_STRIDE_SHIFT), (context->height >> 1) - 1 - (r8 >> FB_STRIDE_SHIFT), context->vop_rounding_control);//0, context->width, 0, context->height);

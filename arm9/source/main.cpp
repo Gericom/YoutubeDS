@@ -39,7 +39,7 @@
 
 static uint8_t mVideoTmpBuffer[TMP_BUFFER_SIZE] __attribute__ ((aligned (32)));
 
-static uint8_t mAudioTmpBuffer[TMP_BUFFER_SIZE] __attribute__ ((aligned (32)));
+//static uint8_t mAudioTmpBuffer[TMP_BUFFER_SIZE] __attribute__ ((aligned (32)));
 
 //static DTCM_DATA uint8_t sDtcmVideoBuf[4096];
 
@@ -65,13 +65,13 @@ static uint8_t* mVideoHeader;
 
 static volatile int mUpscalingEnabled = false;
 
-#define AUDIO_BLOCK_SIZE	(1024)
+//#define AUDIO_BLOCK_SIZE	(1024)
 
-#define NR_WAVE_DATA_BUFFERS	(128)//(32)
+//#define NR_WAVE_DATA_BUFFERS	(128)//(32)
 
-#define WAVE_DATA_BUFFER_LENGTH		(AUDIO_BLOCK_SIZE * NR_WAVE_DATA_BUFFERS)
+//#define WAVE_DATA_BUFFER_LENGTH		(AUDIO_BLOCK_SIZE * NR_WAVE_DATA_BUFFERS)
 
-static s16 mWaveData[WAVE_DATA_BUFFER_LENGTH] __attribute__ ((aligned (32)));
+//static s16 mWaveData[WAVE_DATA_BUFFER_LENGTH] __attribute__ ((aligned (32)));
 
 static int mWaveDataOffs_write = 0;
 
@@ -128,9 +128,11 @@ void StartTimer(int timescale)
 	else if(timescale == 6)
 		timerStart(0, ClockDivider_1024, TIMER_FREQ_1024(6) / (mDoubleSpeedEnabled + 1), frameHandler);
 	else if(timescale == 30000)
-		timerStart(0, ClockDivider_1024, TIMER_FREQ_1024(30) / (mDoubleSpeedEnabled + 1), frameHandler);
+		timerStart(0, ClockDivider_1024, -1092 / (mDoubleSpeedEnabled + 1), frameHandler);
 	else if(timescale == 24000)
 		timerStart(0, ClockDivider_1024, -1365 / (mDoubleSpeedEnabled + 1), frameHandler);
+	else if(timescale == 60000)
+		timerStart(0, ClockDivider_1024, -546 / (mDoubleSpeedEnabled + 1), frameHandler);
 	else if(timescale == 999)
 		timerStart(0, ClockDivider_1024, -3276 / (mDoubleSpeedEnabled + 1), frameHandler);
 	else 
