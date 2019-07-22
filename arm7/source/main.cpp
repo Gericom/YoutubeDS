@@ -31,6 +31,9 @@ int main() {
 	REG_SOUNDCNT |= SOUND_ENABLE;
 	writePowerManagement(PM_CONTROL_REG, ( readPowerManagement(PM_CONTROL_REG) & ~PM_SOUND_MUTE ) | PM_SOUND_AMP );
 	powerOn(POWER_SOUND);
+	
+	if(isDSiMode())
+		REG_SNDEXTCNT |= SNDEXTCNT_FREQ_47KHZ;
 
 	readUserSettings();
 	ledBlink(0);

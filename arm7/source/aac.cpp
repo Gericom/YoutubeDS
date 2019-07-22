@@ -55,19 +55,20 @@ static void onTimerTick()
 
 void aac_play()
 {
+    int tmr = (33513982 + ((sSampleRate + 1) >> 1)) / sSampleRate;
     SCHANNEL_SOURCE(AUDIO_CHANNEL_LEFT) = (u32)aac_audioBuffer;//(u32)sAudioBuf;
     SCHANNEL_REPEAT_POINT(AUDIO_CHANNEL_LEFT) = 0;
     SCHANNEL_LENGTH(AUDIO_CHANNEL_LEFT) = (AUDIO_BLOCK_COUNT * AUDIO_BLOCK_SIZE * 2) >> 2;
-    SCHANNEL_TIMER(AUDIO_CHANNEL_LEFT) = SOUND_FREQ(sSampleRate);
+    SCHANNEL_TIMER(AUDIO_CHANNEL_LEFT) = -(tmr + 1) >> 1;
 
     SCHANNEL_SOURCE(AUDIO_CHANNEL_RIGHT) = (u32)aac_audioBuffer;//(u32)sAudioBuf;
     SCHANNEL_REPEAT_POINT(AUDIO_CHANNEL_RIGHT) = 0;
     SCHANNEL_LENGTH(AUDIO_CHANNEL_RIGHT) = (AUDIO_BLOCK_COUNT * AUDIO_BLOCK_SIZE * 2) >> 2;
-    SCHANNEL_TIMER(AUDIO_CHANNEL_RIGHT) = SOUND_FREQ(sSampleRate);
+    SCHANNEL_TIMER(AUDIO_CHANNEL_RIGHT) = -(tmr + 1) >> 1;
 
     SCHANNEL_CR(AUDIO_CHANNEL_LEFT) = SCHANNEL_ENABLE | SOUND_VOL(0x7F) | SOUND_PAN(0) | SOUND_FORMAT_16BIT | SOUND_REPEAT;
     SCHANNEL_CR(AUDIO_CHANNEL_RIGHT) = SCHANNEL_ENABLE | SOUND_VOL(0x7F) | SOUND_PAN(0x7F) | SOUND_FORMAT_16BIT | SOUND_REPEAT;
-    timerStart(0, ClockDivider_1024, TIMER_FREQ(sSampleRate), onTimerTick);
+    timerStart(0, ClockDivider_1024, -tmr, onTimerTick);
     sAudioStarted = true;
 }
 
@@ -161,13 +162,13 @@ void aac_decode(u8* data, int length)
         }
         leaveCriticalSection(savedIrq);
     }
-    if(!sAudioStarted && sAudioBlockCount >= 8)
+    if(!sAudioStarted)// && sAudioBlockCount >= 8)
         aac_play();
 }
 
 void aac_main()
 {
-    while(sAACInitialized && sDecStarted /*&& sAudioBlockCount < AUDIO_BLOCK_COUNT*/ && sDecBlocksAvailable)//sAACQueue->blockCount > 0)
+    while(sAACInitialized && sDecStarted && sAudioBlockCount < AUDIO_BLOCK_COUNT && sDecBlocksAvailable)//sAACQueue->blockCount > 0)
     {
         sDecBlocksAvailable = false;
         int len = sAACQueue->queueBlockLength[sAACQueue->readBlock];

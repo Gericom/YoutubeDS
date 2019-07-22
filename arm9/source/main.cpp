@@ -470,7 +470,15 @@ ITCM_CODE void PlayVideo()
 		//if(frame == 357)
 		//	asm volatile("mov r11, r11");
 		//cpuStartTiming(2);
+		//cpuStartTiming(1);
 		mpeg4_VideoObjectPlane(&mpeg4DecStruct);
+		// u32 timing = cpuEndTiming();
+		// iprintf("%d\n", timing);
+		// if(frame == 20)
+		// {
+		// 	enterCriticalSection();
+		// 	while(1);
+		// }
 		//uint32_t time = cpuEndTiming();
 		//nocashPrint1("Time: %r0%", time);
 		//char tmp[21];
@@ -478,7 +486,7 @@ ITCM_CODE void PlayVideo()
 		//sprintf(tmp,"0x%x",time);
 		//mToolbar->SetTitle(tmp);
 		frame++;
-		if(frame == 6)
+		if(frame == 1)//6)
 			isVideoPlaying = TRUE;
 		/*if(frame < nrframes && offset == nextAudioBlockOffset)
 		{
@@ -636,14 +644,17 @@ ITCM_CODE void VBlankProc()
 			if(nrFramesInQueue > 0)
 			{
 				void* addr = mUseVramB ? VRAM_B : VRAM_A;
+				//cpuStartTiming(1);
 				if(sVideoWidth == 256)
 					yog2rgb_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
 				else
-					yog2rgb_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
-				//if(sVideoWidth == 256)
-				//	y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
-				//else
-				//	y2r_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+					yog2rgb_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);				
+				// if(sVideoWidth == 256)
+				// 	y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+				// else
+				// 	y2r_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+				//u32 timing = cpuEndTiming();
+				//iprintf("%d\n", timing);
 				DC_FlushRange(addr, FRAME_SIZE * 2);
 				mCopyDone = true;
 			}

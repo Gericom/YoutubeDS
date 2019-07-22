@@ -26,17 +26,17 @@ DITHER_COEF_31 = 5
     orr r4, r4, r5, lsl #16
   
     and r6, r4, #0xFF
-    sub r6, #128 //co
     and r7, r4, #0xFF0000
     mov r7, r7, lsr #16
-    sub r7, #128 //cg
     sub r8, r6, r7 //co - cg
-    sub r6, r8, r6, lsl #1 //-co - cg
+
+    sub r7, #128 //cg
+    add r6, r8, r7, lsl #1 //co + cg
     
     and r9, r3, #0xFF
     add r9, r12
     ldrb r10, [r9, r8]//r
-    ldrb r11, [r9, r6]//b
+    ldrb r11, [r9, -r6]//b
     ldrb r9, [r9, r7]//g    
     //orr r10, #0x8000
     and r5, r3, #0xFF00
@@ -47,7 +47,7 @@ DITHER_COEF_31 = 5
     add r5, r12, r5, lsr #8
     add r5, #DITHER_COEF_10
     ldrb r9, [r5, r8]//r
-    ldrb r11, [r5, r6]//b
+    ldrb r11, [r5, -r6]//b
     ldrb r5, [r5, r7]//g
     //orr r10, #0x80000000
     orr r10, r9, lsl #16
@@ -62,7 +62,7 @@ DITHER_COEF_31 = 5
     add r9, r12
     add r9, #DITHER_COEF_01
     ldrb r10, [r9, r8]//r
-    ldrb r11, [r9, r6]//b
+    ldrb r11, [r9, -r6]//b
     ldrb r9, [r9, r7]//g
     //orr r10, #0x8000
     orr r10, r11, lsl #10
@@ -72,7 +72,7 @@ DITHER_COEF_31 = 5
     add r11, r12, r11, lsr #8
     add r11, #DITHER_COEF_11
     ldrb r8, [r11, r8]//r
-    ldrb r6, [r11, r6]//b
+    ldrb r6, [r11, -r6]//b
     ldrb r7, [r11, r7]//g
     //orr r10, #0x80000000
     orr r10, r8, lsl #16
@@ -82,17 +82,17 @@ DITHER_COEF_31 = 5
 
     //second part
     and r6, r4, #0xFF00
-    sub r6, #(128 << 8) //co
     mov r7, r4, lsr #24
+    rsb r8, r7, r6, lsr #8 //co - cg
+
     sub r7, #128 //cg
-    rsb r8, r7, r6, asr #8 //co - cg
-    sub r6, r8, r6, asr #7 //-co - cg
+    add r6, r8, r7, lsl #1 //co + cg
 
     and r11, r3, #0xFF0000
     add r9, r12, r11, lsr #16
     add r9, #DITHER_COEF_20
     ldrb r10, [r9, r8]//r
-    ldrb r11, [r9, r6]//b
+    ldrb r11, [r9, -r6]//b
     ldrb r9, [r9, r7]//g    
     //orr r10, #0x8000
 
@@ -103,7 +103,7 @@ DITHER_COEF_31 = 5
     
     add r3, #DITHER_COEF_30
     ldrb r9, [r3, r8]//r
-    ldrb r11, [r3, r6]//b
+    ldrb r11, [r3, -r6]//b
     ldrb r3, [r3, r7]//g
     //orr r10, #0x80000000
     orr r10, r9, lsl #16
@@ -115,7 +115,7 @@ DITHER_COEF_31 = 5
     add r9, r12, r11, lsr #16
     add r9, #DITHER_COEF_21
     ldrb r10, [r9, r8]//r
-    ldrb r11, [r9, r6]//b
+    ldrb r11, [r9, -r6]//b
     ldrb r9, [r9, r7]//g    
     //orr r10, #0x8000
 
@@ -126,7 +126,7 @@ DITHER_COEF_31 = 5
     
     add r3, #DITHER_COEF_31
     ldrb r9, [r3, r8]//r
-    ldrb r11, [r3, r6]//b
+    ldrb r11, [r3, -r6]//b
     ldrb r3, [r3, r7]//g
     //orr r10, #0x80000000
     orr r10, r9, lsl #16
