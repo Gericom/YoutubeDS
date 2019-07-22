@@ -13,10 +13,10 @@ export TOPDIR	:=	$(CURDIR)
 NITRODATA	:=	files
 
 # These set the information text in the nds file
-GAME_TITLE := YouTube DS
-GAME_SUBTITLE1 := Watch video's on your DS!
-GAME_SUBTITLE2 := By Gericom
-GAME_ICON := $(CURDIR)/icon.bmp
+GAME_TITLE := MPEG4 Player
+GAME_SUBTITLE1 := By Gericom
+GAME_SUBTITLE2 := ""
+#GAME_ICON := $(CURDIR)/icon.bmp
 
 ifneq ($(strip $(NITRODATA)),)
 	export NITRO_FILES	:=	$(CURDIR)/$(NITRODATA)
