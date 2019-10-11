@@ -446,12 +446,9 @@ int SetRawBlockParams(AACDecInfo *aacDecInfo, int copyLast, int nChans, int samp
  **************************************************************************************/
 int PrepareRawBlock(AACDecInfo *aacDecInfo)
 {
-	PSInfoBase *psi;
-
 	/* validate pointers */
 	if (!aacDecInfo || !aacDecInfo->psInfoBase)
 		return ERR_AAC_NULL_POINTER;
-	psi = (PSInfoBase *)(aacDecInfo->psInfoBase);
 
 	/* syntactic element fields will be read from bitstream for each element */
 	aacDecInfo->prevBlockID = AAC_ID_INVALID;

@@ -269,7 +269,7 @@ int AACFlushCodec(HAACDecoder hAACDecoder)
 int AACDecode(HAACDecoder hAACDecoder, unsigned char **inbuf, int *bytesLeft, short *outbuf)
 {
 	int err, offset, bitOffset, bitsAvail;
-	int ch, baseChan, baseChanSBR, elementChans;
+	int ch, baseChan, elementChans;
 	unsigned char *inptr;
 	AACDecInfo *aacDecInfo = (AACDecInfo *)hAACDecoder;
 #ifdef AAC_ENABLE_SBR
@@ -339,7 +339,6 @@ int AACDecode(HAACDecoder hAACDecoder, unsigned char **inbuf, int *bytesLeft, sh
 
 	bitOffset = 0;
 	baseChan = 0;
-	baseChanSBR = 0;
 	do {
 		/* parse next syntactic element */
 		err = DecodeNextElement(aacDecInfo, &inptr, &bitOffset, &bitsAvail);

@@ -1,6 +1,0 @@
-#include <nds.h>
-#include "youtube_apikey.h"
-
-//Uncomment youtube_apikey and put your api key there, then change the name of this file into youtube_apikey.cpp
-//youtube_apikey.cpp is excluded from git to prevent sharing your private key
-//const char* youtube_apikey = "PLACE YOUR APIKEY HERE";

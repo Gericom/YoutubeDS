@@ -171,7 +171,7 @@ void aac_main()
     while(sAACInitialized && sDecStarted && sAudioBlockCount < AUDIO_BLOCK_COUNT && sDecBlocksAvailable)//sAACQueue->blockCount > 0)
     {
         sDecBlocksAvailable = false;
-        int len = sAACQueue->queueBlockLength[sAACQueue->readBlock];
+        unsigned int len = sAACQueue->queueBlockLength[sAACQueue->readBlock];
         if(len > sizeof(sAACCache))
         {
             while(1);

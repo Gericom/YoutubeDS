@@ -1,35 +1,17 @@
-#include <nds.h>
-#include <filesystem.h>
 #include <fat.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <dswifi9.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <string.h>  
-#include "youtube.h"
-#include "mpeg4.h"
-#include "util.h"
-#include "mpeg4_tables.h"
-#include "aac_pub/aacdec.h"
-#include "ringbufferhttpstream.h"
-#include "copy.h"
-#include "yuv2rgb_new.h"
-#include "gui/font.h"
-#include "gui/UIManager.h"
-#include "gui/Toolbar.h"
-#include "gui/ScreenKeyboard.h"
-#include "gui/ListSlice.h"
-#include "gui/PagingListSliceAdapter.h"
-#include "gui/ProgressBar.h"
-#include "print.h"
-#include "mpu.h"
-#include "mpeg4/mpeg4_header.s"
+#include <filesystem.h>
+#include <nds.h>
+
 #include "aacShared.h"
-#include "lock.h"
 #include "fileBrowse.h"
+#include "lock.h"
+#include "mpu.h"
+#include "mpeg4.h"
+#include "mpeg4_tables.h"
+#include "mpeg4/mpeg4_header.s"
+#include "print.h"
+#include "util.h"
+#include "yuv2rgb_new.h"
 
 #define AAC_ARM7
 
@@ -89,11 +71,7 @@ static uint8_t mUVBuffer[NR_FRAME_BLOCKS][FB_STRIDE * (VIDEO_HEIGHT / 2)] __attr
 
 static int sVideoWidth;
 
-static RingBufferHttpStream* mRingBufferHttpStream;
-
 static volatile int nrFramesMissed = 0;
-static int soundIdL = 0;
-static int soundIdR = 0;
 
 static volatile int stopVideo;
 static volatile int isVideoPlaying;
@@ -198,7 +176,7 @@ ITCM_CODE void PlayVideo()
 	FILE* video = fopen(browseForFile().c_str(), "rb");
 
 	// Clear the screen
-	iprintf ("\x1b[2J");
+	printf("\x1b[2J");
 
 	printf("Opened file: %p\n", video);
 	//find the moov atom
@@ -387,7 +365,6 @@ ITCM_CODE void PlayVideo()
 	
 	int frame = 0;
 	StartTimer(timescale);
-	int keytimer = 0;
 	while((!stopVideo || frame < 20) && frame < nrframes)
 	{
 		if(frame < nrframes && offset == nextAudioBlockOffset)
@@ -473,7 +450,7 @@ ITCM_CODE void PlayVideo()
 		//cpuStartTiming(1);
 		mpeg4_VideoObjectPlane(&mpeg4DecStruct);
 		// u32 timing = cpuEndTiming();
-		// iprintf("%d\n", timing);
+		// printf("%d\n", timing);
 		// if(frame == 20)
 		// {
 		// 	enterCriticalSection();
@@ -538,7 +515,7 @@ ITCM_CODE void PlayVideo()
 		//	mTestAdapter->DoFrameProc();
 		if(frame < 20) stopVideo = FALSE;
 	}
-video_stop:
+// video_stop:
 	timerStop(0);
 	REG_DISPCNT &= ~(DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
 	DMA0_CR = 0;
@@ -558,66 +535,12 @@ video_stop:
 	free(mVideoHeader);
 }
 
-static int state = 0;
-static int state_counter = 0;
-
 static std::string mSearchString;
-static int mSearchStringInvalidated;
-static int mSearchStringCursorPosition;
 
-static void OnToolbarButtonClick(void* context, int button)
-{
-	if(state == 0 && button == TOOLBAR_BUTTON_SEARCH)
-	{
-		state = 1;
-		state_counter = 0;
-	}
-	else if((state == 2 || state == 5) && button == TOOLBAR_BUTTON_BACK)
-	{
-		state = 3;
-		state_counter = 0;
-	}
-	else if(state == 2 && button == TOOLBAR_BUTTON_CLEAR)
-	{
-		mSearchStringCursorPosition = 0;
-		mSearchString.erase();
-		mSearchStringInvalidated = TRUE;
-	}
-}
-
-static void OnKeyboardButtonClick(void* context, int button)
-{
-	if(button & (1 << 16)) //special
-	{
-		if(button == SCREENKEYBOARD_BUTTON_SPECIAL_BACKSPACE && mSearchStringCursorPosition > 0)
-		{
-			mSearchStringCursorPosition--;
-			mSearchString.erase(mSearchStringCursorPosition, 1);
-			mSearchStringInvalidated = TRUE;
-		}
-		else if(button == SCREENKEYBOARD_BUTTON_SPECIAL_SEARCH)
-		{
-			if(mSearchString.length() > 0 && mSearchString.find_first_not_of(' ') != std::string::npos)
-			{
-				state = 4;
-				state_counter = 0;
-			}
-		}
-		return;
-	}
-	mSearchString.insert(mSearchStringCursorPosition, 1, (char)button);
-	mSearchStringCursorPosition++;
-	mSearchStringInvalidated = TRUE;
-}
-
-static int mTextCursorBlinking;
-static int mTextCursorCounter;
 static int mKeyTimer = 0;
 
 static bool mUseVramB = false;
 static bool mCopyDone = false;
-
-static bool mFilterFrame = true;
 
 ITCM_CODE void VBlankProc()
 {
@@ -654,13 +577,13 @@ ITCM_CODE void VBlankProc()
 				// else
 				// 	y2r_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
 				//u32 timing = cpuEndTiming();
-				//iprintf("%d\n", timing);
+				//printf("%d\n", timing);
 				DC_FlushRange(addr, FRAME_SIZE * 2);
 				mCopyDone = true;
 			}
 			else
 			{
-				iprintf("Skip\n");
+				printf("Skip\n");
 				//dmaFillWords(0x801F801F, (void*)&BG_GFX[0], FRAME_SIZE * 2);
 			}			
 			curBlock = firstQueueBlock;
@@ -833,9 +756,9 @@ idle_loop:
 	consoleDemoInit();
 	if(!Wifi_InitDefault(WFC_CONNECT)) 
 	{
-		iprintf("Failed to connect!");
+		printf("Failed to connect!");
 	} 
-	iprintf("Connected\n\n");
+	printf("Connected\n\n");
 	swiWaitForVBlank();
 	swiWaitForVBlank();
 	//YT_SearchListResponse* response = YT_Search("grand dad", NULL);
