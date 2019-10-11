@@ -1,19 +1,19 @@
 #include "fileBrowse.h"
-#include <vector>
 #include <algorithm>
-#include <unistd.h>
-#include <string.h>
-#include <stdio.h>
 #include <dirent.h>
-
 #include <nds.h>
+#include <stdio.h>
+#include <string.h>
+#include <strings.h>
+#include <unistd.h>
+#include <vector>
+
 
 #define SCREEN_COLS 22
 #define ENTRIES_PER_SCREEN 23
 #define ENTRIES_START_ROW 1
 #define OPTIONS_ENTRIES_START_ROW 2
 #define ENTRY_PAGE_LENGTH 10
-bool bigJump = false;
 
 static char path[PATH_MAX];
 
@@ -49,7 +49,7 @@ void getDirectoryContents(std::vector<DirEntry>& dirContents, const std::vector<
 	DIR *pdir = opendir(".");
 
 	if(pdir == NULL) {
-		iprintf("Unable to open the directory.\n");
+		printf("Unable to open the directory.\n");
 	} else {
 		while(true) {
 			DirEntry dirEntry;
@@ -74,27 +74,27 @@ void showDirectoryContents(const std::vector<DirEntry>& dirContents, int fileOff
 	getcwd(path, PATH_MAX);
 
 	// Clear the screen
-	iprintf("\x1b[2J");
+	printf("\x1b[2J");
 
 	// Print the path
 	printf("\x1B[42m");	// Print green color
 	printf("________________________________");
 	printf("\x1b[0;0H");
 	if(strlen(path) < SCREEN_COLS) {
-		iprintf("%s", path);
+		printf("%s", path);
 	} else {
-		iprintf("%s", path + strlen(path) - SCREEN_COLS);
+		printf("%s", path + strlen(path) - SCREEN_COLS);
 	}
 
 	// Move to 2nd row
-	iprintf("\x1b[1;0H");
+	printf("\x1b[1;0H");
 
 	// Print directory listing
 	for(int i = 0; i < (int)(dirContents.size() - startRow) && i < ENTRIES_PER_SCREEN; i++) {
 		const DirEntry* entry = &dirContents.at(i + startRow);
 
 		// Set row
-		iprintf("\x1b[%d;0H", i + ENTRIES_START_ROW);
+		printf("\x1b[%d;0H", i + ENTRIES_START_ROW);
 		if((fileOffset - startRow) == i) {
 			printf("\x1B[47m");	// Print foreground white color
 		} else {
@@ -112,13 +112,10 @@ void showDirectoryContents(const std::vector<DirEntry>& dirContents, int fileOff
 }
 
 std::string browseForFile(void) {
-	int pressed = 0;
-	int screenOffset = 0;
-	int fileOffset = 0;
+	int pressed = 0, held = 0, screenOffset = 0, fileOffset = 0;
 	std::vector<DirEntry> dirContents;
-	std::vector<std::string> extensionList = {"mp4"};
 
-	getDirectoryContents(dirContents, extensionList);
+	getDirectoryContents(dirContents, {"mp4"});
 
 	while(true) {
 		showDirectoryContents(dirContents, fileOffset, screenOffset);
@@ -126,24 +123,27 @@ std::string browseForFile(void) {
 		// Power saving loop. Only poll the keys once per frame and sleep the CPU if there is nothing else to do
 		do {
 			scanKeys();
-			pressed = keysDownRepeat();
+			pressed = keysDown();
+			held = keysDownRepeat();
 			swiWaitForVBlank();
-		} while(!(pressed & KEY_UP) && !(pressed & KEY_DOWN) && !(pressed & KEY_LEFT) && !(pressed & KEY_RIGHT)
-				&& !(pressed & KEY_A) && !(pressed & KEY_B));
+		} while(!((pressed & (KEY_A | KEY_B)) || (held & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT))));
 
 		printf("\x1B[47m");		// Print foreground white color
-		iprintf("\x1b[%d;0H", fileOffset - screenOffset + ENTRIES_START_ROW);
+		printf("\x1b[%d;0H", fileOffset - screenOffset + ENTRIES_START_ROW);
 
-		if(pressed & KEY_UP) {		fileOffset -= 1; bigJump = false;  }
-		if(pressed & KEY_DOWN) {	fileOffset += 1; bigJump = false; }
-		if(pressed & KEY_LEFT) {	fileOffset -= ENTRY_PAGE_LENGTH; bigJump = true; }
-		if(pressed & KEY_RIGHT) {	fileOffset += ENTRY_PAGE_LENGTH; bigJump = true; }
-
-		if((fileOffset < 0) & (bigJump == false))	fileOffset = dirContents.size() - 1;	// Wrap around to bottom of list (UP press)
-		else if((fileOffset < 0) & (bigJump == true))	fileOffset = 0;		// Move to bottom of list (RIGHT press)
-		if((fileOffset > ((int)dirContents.size() - 1)) & (bigJump == false))	fileOffset = 0;		// Wrap around to top of list (DOWN press)
-		else if((fileOffset > ((int)dirContents.size() - 1)) & (bigJump == true))	fileOffset = dirContents.size() - 1;	// Move to top of list (LEFT press)
-
+		if(held & KEY_UP) { 
+			if(fileOffset > 0)	fileOffset--;
+			else	fileOffset = dirContents.size()-1;
+		} else if(held & KEY_DOWN) {
+			if(fileOffset < (int)dirContents.size()-1)	fileOffset++;
+			else	fileOffset = 0;
+		} else if(held & KEY_LEFT) {
+			fileOffset -= ENTRY_PAGE_LENGTH;
+			if(fileOffset < 0)	fileOffset = 0;
+		} else if(held & KEY_RIGHT) {
+			fileOffset += ENTRY_PAGE_LENGTH;
+			if(fileOffset > (int)dirContents.size()-1)	fileOffset = dirContents.size()-1;
+		}
 
 		// Scroll screen if needed
 		if(fileOffset < screenOffset) {
@@ -155,30 +155,24 @@ std::string browseForFile(void) {
 			showDirectoryContents(dirContents, fileOffset, screenOffset);
 		}
 
-		getcwd(path, PATH_MAX);
-
 		if(pressed & KEY_A) {
 			DirEntry* entry = &dirContents.at(fileOffset);
-			if(!((strcmp(entry->name.c_str(), "..") == 0) && (strcmp(path, "fat:/")) == 0)
-			&& !((strcmp(entry->name.c_str(), "..") == 0) && (strcmp(path, "sd:/") == 0))
-			&& !((strcmp(entry->name.c_str(), "..") == 0) && (strcmp(path, "nitro:/") == 0)))
-			{
-				if(entry->isDirectory) {
-					iprintf("Entering directory\n");
-					// Enter selected directory
-					chdir(entry->name.c_str());
-					getDirectoryContents(dirContents, extensionList);
-					screenOffset = 0;
-					fileOffset = 0;
-				} else {
-					return entry->name;
-				}
+			if(entry->isDirectory) {
+				printf("Entering directory\n");
+				// Enter selected directory
+				chdir(entry->name.c_str());
+				getDirectoryContents(dirContents, {"mp4"});
+				screenOffset = 0;
+				fileOffset = 0;
+			} else {
+				return entry->name;
 			}
 		} else if(pressed & KEY_B) {
+			getcwd(path, PATH_MAX);
 			if(!((strcmp(path, "sd:/") == 0) || (strcmp(path, "fat:/") == 0) || (strcmp(path, "nitro:/") == 0))) {
 				// Go up a directory
 				chdir("..");
-				getDirectoryContents(dirContents, extensionList);
+				getDirectoryContents(dirContents, {"mp4"});
 				screenOffset = 0;
 				fileOffset = 0;
 			}
