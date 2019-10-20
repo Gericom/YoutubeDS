@@ -69,7 +69,7 @@ static volatile int lastQueueBlock = 0;//block to write to (most of the time (fi
 static uint8_t mYBuffer[NR_FRAME_BLOCKS][FB_STRIDE * VIDEO_HEIGHT] __attribute__ ((aligned (32)));
 static uint8_t mUVBuffer[NR_FRAME_BLOCKS][FB_STRIDE * (VIDEO_HEIGHT / 2)] __attribute__ ((aligned (32)));
 
-static int sVideoWidth, sVideoHeight;
+static int sVideoWidth, sVideoHeight, sVideoWidthScale;
 
 static volatile int nrFramesMissed = 0;
 
@@ -248,11 +248,12 @@ ITCM_CODE void PlayVideo()
 			{
 				u8* ptr = pHeader + 8;
 				u32 trackId = READ_SAFE_UINT32_BE(ptr + 0x14);
-				// This should get the aspect ratio width/height but isn't working
-				// u32 w = READ_SAFE_UINT32_BE(ptr + 0x54);
-				// printf("width: %ld %lx\n", w, w);
-				// u32 h = READ_SAFE_UINT32_BE(ptr + 0x58);
-				// printf("height: %ld %lx\n", h, h);
+				if(trackId == 1) {
+					sVideoWidthScale = READ_SAFE_UINT32_BE(ptr + 0x52);
+					printf("scale width: %d\n", sVideoWidthScale);
+					int scaleH = READ_SAFE_UINT32_BE(ptr + 0x56);
+					printf("scale height: %d\n", scaleH);
+				}
 				ptr += READ_SAFE_UINT32_BE(ptr);//skip tkhd
 				while(READ_SAFE_UINT32_BE(ptr + 4) != 0x6D646961)//mdia
 					ptr += READ_SAFE_UINT32_BE(ptr);
@@ -340,18 +341,18 @@ ITCM_CODE void PlayVideo()
 	REG_BG2PA = mpeg4DecStruct.width == 256 ? 256 : 176;
 	REG_BG2PB = 0;
 	REG_BG2PC = 0;
-	REG_BG2PD = fullScreen ? 192 : 256;
+	REG_BG2PD = sVideoWidthScale;
 	REG_BG2X = 80;
-	REG_BG2Y = fullScreen ? 0 : -24 << 8;
+	REG_BG2Y = -((192-144*(256/sVideoWidthScale))/2) << 8;
 
 	if(mpeg4DecStruct.width != 256)
 	{
 		REG_BG3PA = 176;
 		REG_BG3PB = 0;
 		REG_BG3PC = 0;
-		REG_BG3PD = fullScreen ? 192 : 256;
+		REG_BG3PD = sVideoWidthScale;
 		REG_BG3X = 80;
-		REG_BG3Y = fullScreen ? 0 : -24 << 8;
+		REG_BG3Y = -((192-144*(256/sVideoWidthScale))/2) << 8;
 		REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_SRC_BG3 | BLEND_DST_BG2 | BLEND_DST_BG3 | BLEND_DST_BACKDROP;
 		REG_BLDALPHA = 8 | (8 << 8);
 	}
@@ -382,7 +383,6 @@ ITCM_CODE void PlayVideo()
 	
 	int frame = 0;
 	StartTimer(timescale);
-	int keytimer = 0;
 	pauseVideo = false;
 	while((!stopVideo || frame < 20) && frame < nrframes)
 	{
