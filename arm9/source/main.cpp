@@ -82,6 +82,8 @@ static char* mStartVideoId;
 
 static int mDoubleSpeedEnabled = 0;
 
+static int nrframes, frame;
+
 #define FRAME_SIZE	(256 * VIDEO_HEIGHT)//(176 * 144)
 //static uint16_t mFrameQueue[FRAME_SIZE * NR_FRAME_BLOCKS] __attribute__ ((aligned (32)));
 
@@ -186,6 +188,9 @@ ITCM_CODE void PlayVideo()
 	// Clear the screen
 	printf("\x1b[2J");
 
+	// Print base progress bar
+	printf("[------------------------------]\n");
+
 	printf("Opened file: %p\n", video);
 	//find the moov atom
 	while(true)
@@ -231,7 +236,7 @@ ITCM_CODE void PlayVideo()
 	uint32_t timescale = 0;
 	uint8_t* framesizes = 0;
 	uint8_t* videoBlockOffsets = 0;
-	int nrframes = 0;
+	nrframes = 0, frame = 0;
 	uint8_t* audioBlockOffsets = 0;
 	audioRate = 0;
 	//parse atoms
@@ -260,6 +265,7 @@ ITCM_CODE void PlayVideo()
 				{
 					ptr += 8;	//skip mdia
 					timescale = READ_SAFE_UINT32_BE(ptr + 0x14);
+					printf("timescale: %ld\n", timescale);
 					mpeg4DecStruct.vop_time_increment_bits = 32 - __builtin_clz(timescale);
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip mdhd
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip hdlr
@@ -280,6 +286,7 @@ ITCM_CODE void PlayVideo()
 					ptr += 8;	//skip stsz
 					ptr += 8;
 					nrframes = READ_SAFE_UINT32_BE(ptr);
+					printf("\x1b[1;26H/%.02d:%.02d\n", nrframes/24/60, (nrframes/24)-((nrframes/24/60)*60));
 					ptr += 4;
 					framesizes = ptr;
 					ptr += nrframes * 4;
@@ -378,8 +385,7 @@ ITCM_CODE void PlayVideo()
 #endif
 	stopVideo = FALSE;
 	mTimeScale = timescale;
-	
-	int frame = 0;
+
 	StartTimer(timescale);
 	pauseVideo = false;
 	while((!stopVideo || frame < 20) && frame < nrframes)
@@ -616,6 +622,9 @@ ITCM_CODE void VBlankProc()
 				nrFramesInQueue--;
 			}
 		}
+
+		printf("\x1b[0;%dH#\n", (int)(((float)frame/nrframes)*30)+1);
+		printf("\x1b[1;21H%.02d:%.02d\n", frame/(mTimeScale/1000)/60, (frame/(mTimeScale/1000))-((frame/(mTimeScale/1000)/60)*60));
 
 		scanKeys();
 		u16 pressed = keysDown();
