@@ -96,7 +96,9 @@ static int soundIdL = 0;
 static int soundIdR = 0;
 
 static volatile int stopVideo;
+static volatile int pauseVideo;
 static volatile int isVideoPlaying;
+static volatile int audioRate;
 
 static char* mStartVideoId;
 
@@ -152,6 +154,11 @@ static void aac_startDecArm7(int sampleRate)
 static void aac_stopDecArm7()
 {
 	fifoSendValue32(FIFO_AAC, AAC_FIFO_CMD_DECSTOP << 28);
+}
+
+static void aac_pauseDecArm7()
+{
+	fifoSendValue32(FIFO_AAC, AAC_FIFO_CMD_DECPAUSE << 28);
 }
 
 static inline void aac_notifyBlock()
@@ -247,7 +254,7 @@ ITCM_CODE void PlayVideo()
 	uint8_t* videoBlockOffsets = 0;
 	int nrframes = 0;
 	uint8_t* audioBlockOffsets = 0;
-	int audioRate = 0;
+	audioRate = 0;
 	//parse atoms
 	while(pHeader < pHeaderEnd)
 	{
@@ -388,8 +395,10 @@ ITCM_CODE void PlayVideo()
 	int frame = 0;
 	StartTimer(timescale);
 	int keytimer = 0;
+	pauseVideo = false;
 	while((!stopVideo || frame < 20) && frame < nrframes)
 	{
+		if(pauseVideo)	continue;
 		if(frame < nrframes && offset == nextAudioBlockOffset)
 		{
 			offset = READ_SAFE_UINT32_BE(videoBlockOffsets);
@@ -623,53 +632,64 @@ ITCM_CODE void VBlankProc()
 {
 	if(isVideoPlaying)//stride dma and frame copy
 	{
-		if(mCopyDone)
-		{
-			mCopyDone = false;
-			if(mUseVramB)
+		if(!pauseVideo) {
+
+			if(mCopyDone)
 			{
-				vramSetBankA(VRAM_A_LCD);
-				vramSetBankB(VRAM_B_MAIN_BG_0x06000000);
-			}
-			else
-			{
-				vramSetBankA(VRAM_A_MAIN_BG_0x06000000);
-				vramSetBankB(VRAM_B_LCD);
-			}
-			mUseVramB = !mUseVramB;
-		}
-		if(mShouldCopyFrame)
-		{
-			mShouldCopyFrame = FALSE;
-			if(nrFramesInQueue > 0)
-			{
-				void* addr = mUseVramB ? VRAM_B : VRAM_A;
-				//cpuStartTiming(1);
-				if(sVideoWidth == 256)
-					yog2rgb_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+				mCopyDone = false;
+				if(mUseVramB)
+				{
+					vramSetBankA(VRAM_A_LCD);
+					vramSetBankB(VRAM_B_MAIN_BG_0x06000000);
+				}
 				else
-					yog2rgb_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);				
-				// if(sVideoWidth == 256)
-				// 	y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
-				// else
-				// 	y2r_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
-				//u32 timing = cpuEndTiming();
-				//iprintf("%d\n", timing);
-				DC_FlushRange(addr, FRAME_SIZE * 2);
-				mCopyDone = true;
+				{
+					vramSetBankA(VRAM_A_MAIN_BG_0x06000000);
+					vramSetBankB(VRAM_B_LCD);
+				}
+				mUseVramB = !mUseVramB;
 			}
-			else
+			if(mShouldCopyFrame)
 			{
-				iprintf("Skip\n");
-				//dmaFillWords(0x801F801F, (void*)&BG_GFX[0], FRAME_SIZE * 2);
-			}			
-			curBlock = firstQueueBlock;
-			firstQueueBlock = (firstQueueBlock + 1) % NR_FRAME_BLOCKS;
-			nrFramesInQueue--;
+				mShouldCopyFrame = FALSE;
+				if(nrFramesInQueue > 0)
+				{
+					void* addr = mUseVramB ? VRAM_B : VRAM_A;
+					//cpuStartTiming(1);
+					if(sVideoWidth == 256)
+						yog2rgb_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+					else
+						yog2rgb_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);				
+					// if(sVideoWidth == 256)
+					// 	y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+					// else
+					// 	y2r_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+					//u32 timing = cpuEndTiming();
+					//iprintf("%d\n", timing);
+					DC_FlushRange(addr, FRAME_SIZE * 2);
+					mCopyDone = true;
+				}
+				else
+				{
+					iprintf("Skip\n");
+					//dmaFillWords(0x801F801F, (void*)&BG_GFX[0], FRAME_SIZE * 2);
+				}
+				curBlock = firstQueueBlock;
+				firstQueueBlock = (firstQueueBlock + 1) % NR_FRAME_BLOCKS;
+				nrFramesInQueue--;
+			}
 		}
 
 		scanKeys();
 		if(keysDown() & KEY_B)	stopVideo = true;
+		if(keysDown() & KEY_A) {
+			pauseVideo = !pauseVideo;
+			// if(pauseVideo)	
+			aac_pauseDecArm7();
+			// else {
+			// 	aac_startDecArm7(audioRate);
+			// }
+		}
 	}
 	else
 		mKeyTimer = 0;

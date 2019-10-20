@@ -5,7 +5,8 @@
 #define AAC_FIFO_CMD_SET_QUEUE      0
 #define AAC_FIFO_CMD_DECSTART       1
 #define AAC_FIFO_CMD_DECSTOP        2
-#define AAC_FIFO_CMD_NOTIFY_BLOCK   3
+#define AAC_FIFO_CMD_DECPAUSE       3
+#define AAC_FIFO_CMD_NOTIFY_BLOCK   4
 
 #define AAC_QUEUE_BLOCK_SIZE		(2 * 1024)
 #define AAC_QUEUE_BLOCK_COUNT	    20
