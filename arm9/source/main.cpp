@@ -85,8 +85,6 @@ static int mDoubleSpeedEnabled = 0;
 #define FRAME_SIZE	(256 * VIDEO_HEIGHT)//(176 * 144)
 //static uint16_t mFrameQueue[FRAME_SIZE * NR_FRAME_BLOCKS] __attribute__ ((aligned (32)));
 
-static bool fullScreen = false;
-
 static volatile int mShouldCopyFrame;
 
 ITCM_CODE static void frameHandler()
@@ -630,19 +628,6 @@ ITCM_CODE void VBlankProc()
 			// }
 		} else if(pressed & KEY_B) {
 			stopVideo = true;
-		} else if(pressed & KEY_SELECT) { // Toggle full screen
-			fullScreen = !fullScreen;
-			if(fullScreen) {
-				REG_BG2PD = 192;
-				REG_BG2Y = 0;
-				REG_BG3PD = 192;
-				REG_BG3Y = 0;
-			} else {
-				REG_BG2PD = 256;
-				REG_BG2Y = -24 << 8;
-				REG_BG3PD = 256;
-				REG_BG3Y = -24 << 8;
-			}
 		}
 	}
 	else
