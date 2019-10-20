@@ -69,7 +69,7 @@ static volatile int lastQueueBlock = 0;//block to write to (most of the time (fi
 static uint8_t mYBuffer[NR_FRAME_BLOCKS][FB_STRIDE * VIDEO_HEIGHT] __attribute__ ((aligned (32)));
 static uint8_t mUVBuffer[NR_FRAME_BLOCKS][FB_STRIDE * (VIDEO_HEIGHT / 2)] __attribute__ ((aligned (32)));
 
-static int sVideoWidth;
+static int sVideoWidth, sVideoHeight;
 
 static volatile int nrFramesMissed = 0;
 
@@ -80,8 +80,10 @@ static char* mStartVideoId;
 
 static int mDoubleSpeedEnabled = 0;
 
-#define FRAME_SIZE	(256 * 144)//(176 * 144)
+#define FRAME_SIZE	(256 * VIDEO_HEIGHT)//(176 * 144)
 //static uint16_t mFrameQueue[FRAME_SIZE * NR_FRAME_BLOCKS] __attribute__ ((aligned (32)));
+
+static bool fullScreen = false;
 
 static volatile int mShouldCopyFrame;
 
@@ -173,7 +175,8 @@ ITCM_CODE void PlayVideo()
 	mVideoHeader = (uint8_t*)malloc(SWAP_CONSTANT_32(header_size));
 	mRingBufferHttpStream->Read(mVideoHeader + 4, SWAP_CONSTANT_32(header_size) - 4);
 #else
-	FILE* video = fopen(browseForFile().c_str(), "rb");
+	std::string fileName = browseForFile();
+	FILE* video = fopen(fileName.c_str(), "rb");
 
 	// Clear the screen
 	printf("\x1b[2J");
@@ -201,7 +204,7 @@ ITCM_CODE void PlayVideo()
 #endif
 	memset(&mpeg4DecStruct, 0, sizeof(mpeg4DecStruct));
 	mpeg4DecStruct.pData = &mVideoTmpBuffer[0];
-	mpeg4DecStruct.height = 144;
+	mpeg4DecStruct.height = VIDEO_HEIGHT;
 	mpeg4DecStruct.pDstY = &mYBuffer[0][0];
 	mpeg4DecStruct.pDstUV = &mUVBuffer[0][0];
 	mpeg4DecStruct.pIntraDCTVLCTable = &mpeg4_table_b16[0];
@@ -238,6 +241,11 @@ ITCM_CODE void PlayVideo()
 			{
 				u8* ptr = pHeader + 8;
 				u32 trackId = READ_SAFE_UINT32_BE(ptr + 0x14);
+				// This should get the aspect ratio width/height but isn't working
+				// u32 w = READ_SAFE_UINT32_BE(ptr + 0x54);
+				// printf("width: %ld %lx\n", w, w);
+				// u32 h = READ_SAFE_UINT32_BE(ptr + 0x58);
+				// printf("height: %ld %lx\n", h, h);
 				ptr += READ_SAFE_UINT32_BE(ptr);//skip tkhd
 				while(READ_SAFE_UINT32_BE(ptr + 4) != 0x6D646961)//mdia
 					ptr += READ_SAFE_UINT32_BE(ptr);
@@ -257,6 +265,8 @@ ITCM_CODE void PlayVideo()
 					//stsd
 					sVideoWidth = READ_SAFE_UINT32_BE(ptr + 0x2E);
 					printf("width: %d\n", sVideoWidth);
+					sVideoHeight = *(ptr+0x33) | (*(ptr+0x32) << 8);
+					printf("height: %d\n", sVideoHeight);
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stsd
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stts
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stss
@@ -313,7 +323,7 @@ ITCM_CODE void PlayVideo()
 	//vramSetBankE(VRAM_E_MAIN_BG);
 	dmaFillWords(0, (void*)0x06000000, 256 * 192 * 2);
 	vramSetBankC(VRAM_C_LCD);
-	dmaFillWords(0x80008000, (void*)VRAM_C, 256 * 144 * 2);
+	dmaFillWords(0x80008000, (void*)VRAM_C, 256 * VIDEO_HEIGHT * 2);
 	vramSetBankC(VRAM_C_MAIN_BG_0x06000000);
 	bgInit(2, BgType_Bmp8, BgSize_B16_256x256, 0,0);
 	bgInit(3, BgType_Bmp8, BgSize_B16_256x256, 0,0);
@@ -323,18 +333,18 @@ ITCM_CODE void PlayVideo()
 	REG_BG2PA = mpeg4DecStruct.width == 256 ? 256 : 176;
 	REG_BG2PB = 0;
 	REG_BG2PC = 0;
-	REG_BG2PD = 256;
-	REG_BG2X = 0;
-	REG_BG2Y = -24 << 8;
+	REG_BG2PD = fullScreen ? 192 : 256;
+	REG_BG2X = 80;
+	REG_BG2Y = fullScreen ? 0 : -24 << 8;
 
 	if(mpeg4DecStruct.width != 256)
 	{
 		REG_BG3PA = 176;
 		REG_BG3PB = 0;
 		REG_BG3PC = 0;
-		REG_BG3PD = 256;
+		REG_BG3PD = fullScreen ? 192 : 256;
 		REG_BG3X = 80;
-		REG_BG3Y = -24 << 8;
+		REG_BG3Y = fullScreen ? 0 : -24 << 8;
 		REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_SRC_BG3 | BLEND_DST_BG2 | BLEND_DST_BG3 | BLEND_DST_BACKDROP;
 		REG_BLDALPHA = 8 | (8 << 8);
 	}
@@ -533,6 +543,11 @@ ITCM_CODE void PlayVideo()
 #endif
 	fclose(video);
 	free(mVideoHeader);
+
+	// Mark video as watched
+	std::vector<std::string> watchedList = watchedListGet();
+	watchedListAdd(watchedList, fileName);
+	watchedListSave(watchedList);
 }
 
 static std::string mSearchString;
@@ -566,12 +581,12 @@ ITCM_CODE void VBlankProc()
 			mShouldCopyFrame = FALSE;
 			if(nrFramesInQueue > 0)
 			{
-				void* addr = mUseVramB ? VRAM_B : VRAM_A;
+				u16* addr = mUseVramB ? VRAM_B : VRAM_A;
 				//cpuStartTiming(1);
 				if(sVideoWidth == 256)
-					yog2rgb_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+					yog2rgb_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], addr);
 				else
-					yog2rgb_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);				
+					yog2rgb_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], addr);				
 				// if(sVideoWidth == 256)
 				// 	y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
 				// else
@@ -593,6 +608,20 @@ ITCM_CODE void VBlankProc()
 
 		scanKeys();
 		if(keysDown() & KEY_B)	stopVideo = true;
+		else if(keysDown() & KEY_SELECT) { // Toggle full screen
+			fullScreen = !fullScreen;
+			if(fullScreen) {
+				REG_BG2PD = 192;
+				REG_BG2Y = 0;
+				REG_BG3PD = 192;
+				REG_BG3Y = 0;
+			} else {
+				REG_BG2PD = 256;
+				REG_BG2Y = -24 << 8;
+				REG_BG3PD = 256;
+				REG_BG3Y = -24 << 8;
+			}
+		}
 	}
 	else
 		mKeyTimer = 0;

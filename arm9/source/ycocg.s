@@ -24,7 +24,7 @@ DITHER_COEF_31 = 5
     ldr r3, [r0], #4    //4 y samples
 
     orr r4, r4, r5, lsl #16
-  
+
     and r6, r4, #0xFF
     and r7, r4, #0xFF0000
     mov r7, r7, lsr #16
@@ -32,12 +32,12 @@ DITHER_COEF_31 = 5
 
     sub r7, #128 //cg
     add r6, r8, r7, lsl #1 //co + cg
-    
+
     and r9, r3, #0xFF
     add r9, r12
     ldrb r10, [r9, r8]//r
     ldrb r11, [r9, -r6]//b
-    ldrb r9, [r9, r7]//g    
+    ldrb r9, [r9, r7]//g
     //orr r10, #0x8000
     and r5, r3, #0xFF00
 
@@ -93,14 +93,14 @@ DITHER_COEF_31 = 5
     add r9, #DITHER_COEF_20
     ldrb r10, [r9, r8]//r
     ldrb r11, [r9, -r6]//b
-    ldrb r9, [r9, r7]//g    
+    ldrb r9, [r9, r7]//g
     //orr r10, #0x8000
 
     add r3, r12, r3, lsr #24
 
     orr r10, r11, lsl #10
     orr r10, r9, lsl #5
-    
+
     add r3, #DITHER_COEF_30
     ldrb r9, [r3, r8]//r
     ldrb r11, [r3, -r6]//b
@@ -116,14 +116,14 @@ DITHER_COEF_31 = 5
     add r9, #DITHER_COEF_21
     ldrb r10, [r9, r8]//r
     ldrb r11, [r9, -r6]//b
-    ldrb r9, [r9, r7]//g    
+    ldrb r9, [r9, r7]//g
     //orr r10, #0x8000
 
     add r3, r12, r5, lsr #24
 
     orr r10, r11, lsl #10
     orr r10, r9, lsl #5
-    
+
     add r3, #DITHER_COEF_31
     ldrb r9, [r3, r8]//r
     ldrb r11, [r3, -r6]//b
@@ -142,7 +142,7 @@ DITHER_COEF_31 = 5
 	add r1, r1, #128
 	add r2, r2, #512
     cmp lr, #0
-        bne 1b    
+        bne 1b
     ldmfd sp!, {r4-r11, pc}
 .else
     and r9, lr, #0xFF
@@ -150,9 +150,9 @@ DITHER_COEF_31 = 5
         bne 1b
 	add r0, #(256 + 80)
 	add r1, #(128 + 40)
-    add r2, #(512 + 160)    
+    add r2, #(512 + 160)
     subs lr, #80
-        bne 1b 
+        bne 1b
     ldmfd sp!, {r4-r11, pc}
 .endif
 .endm
