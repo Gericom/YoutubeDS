@@ -286,7 +286,7 @@ ITCM_CODE void PlayVideo()
 					ptr += 8;	//skip stsz
 					ptr += 8;
 					nrframes = READ_SAFE_UINT32_BE(ptr);
-					printf("\x1b[1;26H/%.02d:%.02d\n", nrframes/24/60, (nrframes/24)-((nrframes/24/60)*60));
+					printf("\x1b[1;26H/%.02d:%.02d\n", nrframes/(mTimeScale/1000)/60, (nrframes/(mTimeScale/1000))-((nrframes/(mTimeScale/1000)/60)*60));
 					ptr += 4;
 					framesizes = ptr;
 					ptr += nrframes * 4;
