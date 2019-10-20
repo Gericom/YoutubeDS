@@ -343,7 +343,7 @@ ITCM_CODE void PlayVideo()
 	REG_BG2PC = 0;
 	REG_BG2PD = sVideoWidthScale;
 	REG_BG2X = 80;
-	REG_BG2Y = -((192-144*(256/sVideoWidthScale))/2) << 8;
+	REG_BG2Y = -(int)((192-144*(256/(float)sVideoWidthScale))/2) << 8;
 
 	if(mpeg4DecStruct.width != 256)
 	{
@@ -352,7 +352,7 @@ ITCM_CODE void PlayVideo()
 		REG_BG3PC = 0;
 		REG_BG3PD = sVideoWidthScale;
 		REG_BG3X = 80;
-		REG_BG3Y = -((192-144*(256/sVideoWidthScale))/2) << 8;
+		REG_BG3Y = -(int)((192-144*(256/(float)sVideoWidthScale))/2) << 8;
 		REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_SRC_BG3 | BLEND_DST_BG2 | BLEND_DST_BG3 | BLEND_DST_BACKDROP;
 		REG_BLDALPHA = 8 | (8 << 8);
 	}
