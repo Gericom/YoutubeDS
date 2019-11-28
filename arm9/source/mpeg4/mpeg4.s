@@ -366,14 +366,14 @@ mpeg4_macroblock_16x16_predict:
 	moveq r10, r11
 	moveq r6, r5
 	moveq r12, r11
-	beq 1f	
+	beq 1f
 	mov r4, r6
 	mov r10, r12
 	mov r5, r6
 	mov r11, r12
 
 	@ cmp r0, #2
-	@ bne 1f	
+	@ bne 1f
 	@ cmp r3, #0
 	@ movne r5, r4
 	@ movne r11, r10
@@ -385,7 +385,7 @@ mpeg4_macroblock_16x16_predict:
 	@ movne r10, r11
 	@ movne r6, r5
 	@ movne r12, r11
-	@ bne 1f	
+	@ bne 1f
 	@ mov r4, r6
 	@ mov r10, r12
 	@ mov r5, r6
@@ -507,7 +507,7 @@ mpeg4_macroblock_8x8_predict:
 	ldrnesh r12, [r1, #((-(STRIDE >> 1) + 8) + 2)]
 
 	cmp r0, #2
-	bne 1f	
+	bne 1f
 	cmp r3, #0
 	movne r5, r4
 	movne r11, r10
@@ -519,7 +519,7 @@ mpeg4_macroblock_8x8_predict:
 	movne r10, r11
 	movne r6, r5
 	movne r12, r11
-	bne 1f	
+	bne 1f
 	mov r4, r6
 	mov r10, r12
 	mov r5, r6
@@ -830,7 +830,7 @@ mpeg4_macroblock_8x8_predict:
 	addge r11, #1
 	cmp lr, #14
 	addge r11, #1 //#2
-	
+
 	and lr, r12, #0xF
 	bic r12, #0xF
 	mov r12, r12, asr #3
@@ -1545,7 +1545,7 @@ mpeg4_block_read_dct:
 	//str r5, [sp, #-(4 + (64 << 2))]
 	//push {r5}
 	push {r5}
-	//push {r5, r6, r9, r10, r11}	
+	//push {r5, r6, r9, r10, r11}
 	ldr r4,= mpeg4_dct_tmp
 	movne r12, #0
 	mov r12, r12, lsl #16
@@ -1846,7 +1846,7 @@ mpeg4_BitReader_FillBits:
 	ldrb r12, [r1], #1
 	rsb lr, r2, #8 //#0x10
 	orr r3, r12, lsl lr
-	ldrb r12, [r1], #1	
+	ldrb r12, [r1], #1
 	add r2, #16
 	sub lr, #8
 	orr r3, r12, lsl lr

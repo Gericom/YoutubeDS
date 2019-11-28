@@ -81,7 +81,7 @@ void aac_stop()
 }
 
 void aac_reset()
-{    
+{
     aac_stop();
     sDecStarted = false;
     sDecBlocksAvailable = false;
@@ -103,16 +103,16 @@ void aac_initDecoder(int sampleRate)
     sAACDecoder = AACInitDecoder();
     sSampleRate = sampleRate;
     AACFrameInfo frameInfo;
-	frameInfo.bitRate = 0;
-	frameInfo.nChans = 1;
-	frameInfo.sampRateCore = sSampleRate;
-	frameInfo.sampRateOut = sSampleRate;
-	frameInfo.bitsPerSample = 16;
-	frameInfo.outputSamps = 0;
-	frameInfo.profile = 0;
-	frameInfo.tnsUsed = 0;
-	frameInfo.pnsUsed = 0;
-	AACSetRawBlockParams(sAACDecoder, 0, &frameInfo);
+    frameInfo.bitRate = 0;
+    frameInfo.nChans = 1;
+    frameInfo.sampRateCore = sSampleRate;
+    frameInfo.sampRateOut = sSampleRate;
+    frameInfo.bitsPerSample = 16;
+    frameInfo.outputSamps = 0;
+    frameInfo.profile = 0;
+    frameInfo.tnsUsed = 0;
+    frameInfo.pnsUsed = 0;
+    AACSetRawBlockParams(sAACDecoder, 0, &frameInfo);
     sAACInitialized = true;
 }
 
@@ -132,6 +132,10 @@ static void onFifoCommand(u32 command, void* userdata)
         case AAC_FIFO_CMD_DECSTOP:
             aac_reset();
             break;
+        case AAC_FIFO_CMD_DECPAUSE:
+            sAACInitialized = !sAACInitialized;
+            if(!sAACInitialized)    aac_stop();
+            break;
         case AAC_FIFO_CMD_NOTIFY_BLOCK:
             sDecBlocksAvailable = true;
             break;
@@ -146,10 +150,10 @@ void aac_init()
 
 void aac_decode(u8* data, int length)
 {
-    while(length > 0)
+    while(length > 0 && sAACInitialized)
     {
         int err = 0;
-        if((err = AACDecode(sAACDecoder, &data, &length, &aac_audioBuffer[sNextAudioBlock * AUDIO_BLOCK_SIZE])) < 0) 
+        if((err = AACDecode(sAACDecoder, &data, &length, &aac_audioBuffer[sNextAudioBlock * AUDIO_BLOCK_SIZE])) < 0)
         {
             while(1);
             break;
@@ -158,7 +162,7 @@ void aac_decode(u8* data, int length)
         //critical section, we don't want the audio block count to clash with a timer tick
         int savedIrq = enterCriticalSection();
         {
-            sAudioBlockCount++;
+            if(sAACInitialized) sAudioBlockCount++;
         }
         leaveCriticalSection(savedIrq);
     }
@@ -170,19 +174,19 @@ void aac_main()
 {
     while(sAACInitialized && sDecStarted && sAudioBlockCount < AUDIO_BLOCK_COUNT && sDecBlocksAvailable)//sAACQueue->blockCount > 0)
     {
-        sDecBlocksAvailable = false;
-        int len = sAACQueue->queueBlockLength[sAACQueue->readBlock];
-        if(len > sizeof(sAACCache))
-        {
+        if(sAACInitialized)    sDecBlocksAvailable = false;
+        unsigned len = sAACQueue->queueBlockLength[sAACQueue->readBlock];
+        if(sAACInitialized && len > sizeof(sAACCache)) {
             while(1);
         }
-        dmaCopyWords(3, &sAACQueue->queue[sAACQueue->readBlock][0], sAACCache, (len + 3) & ~3);
-        aac_decode(sAACCache, len);
-        sAACQueue->readBlock = (sAACQueue->readBlock + 1) % AAC_QUEUE_BLOCK_COUNT;
-        lock_lock(&sAACQueue->countLock);
-        {
+        if(sAACInitialized)    dmaCopyWords(3, &sAACQueue->queue[sAACQueue->readBlock][0], sAACCache, (len + 3) & ~3);
+        if(sAACInitialized)    aac_decode(sAACCache, len);
+        if(sAACInitialized)    sAACQueue->readBlock = (sAACQueue->readBlock + 1) % AAC_QUEUE_BLOCK_COUNT;
+        if(sAACInitialized)    lock_lock(&sAACQueue->countLock);
+        if(sAACInitialized)    {
             sAACQueue->blockCount--;
         }
-        lock_unlock(&sAACQueue->countLock);
+        if(sAACInitialized)     lock_unlock(&sAACQueue->countLock);
+        if(!sAACInitialized)    aac_stop();
     }
 }

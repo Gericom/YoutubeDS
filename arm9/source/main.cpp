@@ -1,39 +1,22 @@
-#include <nds.h>
-#include <filesystem.h>
 #include <fat.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <dswifi9.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <string.h>  
-#include "youtube.h"
-#include "mpeg4.h"
-#include "util.h"
-#include "mpeg4_tables.h"
-#include "aac_pub/aacdec.h"
-#include "ringbufferhttpstream.h"
-#include "copy.h"
-#include "yuv2rgb_new.h"
-#include "gui/font.h"
-#include "gui/UIManager.h"
-#include "gui/Toolbar.h"
-#include "gui/ScreenKeyboard.h"
-#include "gui/ListSlice.h"
-#include "gui/PagingListSliceAdapter.h"
-#include "gui/ProgressBar.h"
-#include "print.h"
-#include "mpu.h"
-#include "mpeg4/mpeg4_header.s"
+#include <filesystem.h>
+#include <nds.h>
+
 #include "aacShared.h"
-#include "lock.h"
 #include "fileBrowse.h"
+#include "graphics.h"
+#include "lock.h"
+#include "mpu.h"
+#include "mpeg4.h"
+#include "mpeg4_tables.h"
+#include "mpeg4/mpeg4_header.s"
+#include "print.h"
+#include "util.h"
+#include "yuv2rgb_new.h"
 
 #define AAC_ARM7
 
-#define VIDEO_HEIGHT	144
+#define VIDEO_HEIGHT	192
 
 #define TMP_BUFFER_SIZE		(64 * 1024)
 
@@ -87,22 +70,24 @@ static volatile int lastQueueBlock = 0;//block to write to (most of the time (fi
 static uint8_t mYBuffer[NR_FRAME_BLOCKS][FB_STRIDE * VIDEO_HEIGHT] __attribute__ ((aligned (32)));
 static uint8_t mUVBuffer[NR_FRAME_BLOCKS][FB_STRIDE * (VIDEO_HEIGHT / 2)] __attribute__ ((aligned (32)));
 
-static int sVideoWidth;
-
-static RingBufferHttpStream* mRingBufferHttpStream;
+static int sVideoWidth, sVideoHeight, sVideoWidthScale;
 
 static volatile int nrFramesMissed = 0;
-static int soundIdL = 0;
-static int soundIdR = 0;
 
 static volatile int stopVideo;
+static volatile int pauseVideo;
 static volatile int isVideoPlaying;
+static volatile int audioRate;
 
 static char* mStartVideoId;
 
 static int mDoubleSpeedEnabled = 0;
 
-#define FRAME_SIZE	(256 * 144)//(176 * 144)
+static int nrframes, frame;
+
+static volatile int skip = 0;
+
+#define FRAME_SIZE	(256 * 192)//(176 * 144)
 //static uint16_t mFrameQueue[FRAME_SIZE * NR_FRAME_BLOCKS] __attribute__ ((aligned (32)));
 
 static volatile int mShouldCopyFrame;
@@ -135,7 +120,7 @@ void StartTimer(int timescale)
 		timerStart(0, ClockDivider_1024, -546 / (mDoubleSpeedEnabled + 1), frameHandler);
 	else if(timescale == 999)
 		timerStart(0, ClockDivider_1024, -3276 / (mDoubleSpeedEnabled + 1), frameHandler);
-	else 
+	else
 		timerStart(0, ClockDivider_1024, TIMER_FREQ_1024(10) / (mDoubleSpeedEnabled + 1), frameHandler);
 }
 
@@ -152,6 +137,11 @@ static void aac_startDecArm7(int sampleRate)
 static void aac_stopDecArm7()
 {
 	fifoSendValue32(FIFO_AAC, AAC_FIFO_CMD_DECSTOP << 28);
+}
+
+static void aac_pauseDecArm7()
+{
+	fifoSendValue32(FIFO_AAC, AAC_FIFO_CMD_DECPAUSE << 28);
 }
 
 static inline void aac_notifyBlock()
@@ -195,10 +185,15 @@ ITCM_CODE void PlayVideo()
 	mVideoHeader = (uint8_t*)malloc(SWAP_CONSTANT_32(header_size));
 	mRingBufferHttpStream->Read(mVideoHeader + 4, SWAP_CONSTANT_32(header_size) - 4);
 #else
-	FILE* video = fopen(browseForFile().c_str(), "rb");
+	std::string fileName = browseForFile({"mp4"});
+	FILE* video = fopen(fileName.c_str(), "rb");
 
 	// Clear the screen
-	iprintf ("\x1b[2J");
+	printf("\x1b[2J");
+	drawRectangle(0, 0, 256, 192, 0);
+
+	// Draw progress bar background
+	drawRectangle(35, 6, 185, 7, 5);
 
 	printf("Opened file: %p\n", video);
 	//find the moov atom
@@ -212,7 +207,7 @@ ITCM_CODE void PlayVideo()
 		printf("atom: %lx\n", SWAP_CONSTANT_32(atom));
 		if(atom == 0x766F6F6D)
 		{
-			fseek(video, -8, SEEK_CUR);			
+			fseek(video, -8, SEEK_CUR);
 			mVideoHeader = (uint8_t*)malloc(SWAP_CONSTANT_32(size));
 			fread(mVideoHeader, 1, SWAP_CONSTANT_32(size), video);
 			break;
@@ -223,7 +218,6 @@ ITCM_CODE void PlayVideo()
 #endif
 	memset(&mpeg4DecStruct, 0, sizeof(mpeg4DecStruct));
 	mpeg4DecStruct.pData = &mVideoTmpBuffer[0];
-	mpeg4DecStruct.height = 144;
 	mpeg4DecStruct.pDstY = &mYBuffer[0][0];
 	mpeg4DecStruct.pDstUV = &mUVBuffer[0][0];
 	mpeg4DecStruct.pIntraDCTVLCTable = &mpeg4_table_b16[0];
@@ -237,7 +231,7 @@ ITCM_CODE void PlayVideo()
 
 	//find the header data we need
 	uint8_t* pHeader = mVideoHeader;
-	u32 moovSize = READ_SAFE_UINT32_BE(pHeader);	
+	u32 moovSize = READ_SAFE_UINT32_BE(pHeader);
 	printf("moovSize: %lx\n", moovSize);
 	uint8_t* pHeaderEnd = pHeader + moovSize;
 	pHeader += 8;	//skip moov header
@@ -245,9 +239,9 @@ ITCM_CODE void PlayVideo()
 	uint32_t timescale = 0;
 	uint8_t* framesizes = 0;
 	uint8_t* videoBlockOffsets = 0;
-	int nrframes = 0;
+	nrframes = 0, frame = 0;
 	uint8_t* audioBlockOffsets = 0;
-	int audioRate = 0;
+	audioRate = 0;
 	//parse atoms
 	while(pHeader < pHeaderEnd)
 	{
@@ -260,14 +254,21 @@ ITCM_CODE void PlayVideo()
 			{
 				u8* ptr = pHeader + 8;
 				u32 trackId = READ_SAFE_UINT32_BE(ptr + 0x14);
+				if(trackId == 1) {
+					sVideoWidthScale = READ_SAFE_UINT32_BE(ptr + 0x52);
+					printf("scale width: %d\n", sVideoWidthScale);
+					int scaleH = READ_SAFE_UINT32_BE(ptr + 0x56);
+					printf("scale height: %d\n", scaleH);
+				}
 				ptr += READ_SAFE_UINT32_BE(ptr);//skip tkhd
 				while(READ_SAFE_UINT32_BE(ptr + 4) != 0x6D646961)//mdia
 					ptr += READ_SAFE_UINT32_BE(ptr);
-				
+
 				if(trackId == 1)
 				{
 					ptr += 8;	//skip mdia
 					timescale = READ_SAFE_UINT32_BE(ptr + 0x14);
+					printf("timescale: %ld\n", timescale);
 					mpeg4DecStruct.vop_time_increment_bits = 32 - __builtin_clz(timescale);
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip mdhd
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip hdlr
@@ -279,6 +280,8 @@ ITCM_CODE void PlayVideo()
 					//stsd
 					sVideoWidth = READ_SAFE_UINT32_BE(ptr + 0x2E);
 					printf("width: %d\n", sVideoWidth);
+					sVideoHeight = *(ptr+0x33) | (*(ptr+0x32) << 8);
+					printf("height: %d\n", sVideoHeight);
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stsd
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stts
 					ptr += READ_SAFE_UINT32_BE(ptr);//skip stss
@@ -286,6 +289,10 @@ ITCM_CODE void PlayVideo()
 					ptr += 8;	//skip stsz
 					ptr += 8;
 					nrframes = READ_SAFE_UINT32_BE(ptr);
+					char time[14];
+					snprintf(time, sizeof(time), "%.02ld:%.02ld", nrframes/(timescale/1000)/60, (nrframes/(timescale/1000))-((nrframes/(timescale/1000)/60)*60));
+					drawRectangle(223, 1, 33, 16, 0);
+					printText(time, 1, 1, 1, 223, 1);
 					ptr += 4;
 					framesizes = ptr;
 					ptr += nrframes * 4;
@@ -316,13 +323,14 @@ ITCM_CODE void PlayVideo()
 	}
 
 	mpeg4DecStruct.width = sVideoWidth;
+	mpeg4DecStruct.height = sVideoHeight;
 
 	uint32_t offset = READ_SAFE_UINT32_BE(videoBlockOffsets);
-	uint32_t nextAudioBlockOffset = READ_SAFE_UINT32_BE(audioBlockOffsets);	
+	uint32_t nextAudioBlockOffset = READ_SAFE_UINT32_BE(audioBlockOffsets);
 	audioBlockOffsets += 4;
 	if(nextAudioBlockOffset < offset)
 		offset = nextAudioBlockOffset;
-	else		
+	else
 		videoBlockOffsets += 4;
 #ifdef USE_WIFI
 	mRingBufferHttpStream->Read(NULL, offset - mRingBufferHttpStream->GetStreamPosition());
@@ -335,7 +343,9 @@ ITCM_CODE void PlayVideo()
 	//vramSetBankE(VRAM_E_MAIN_BG);
 	dmaFillWords(0, (void*)0x06000000, 256 * 192 * 2);
 	vramSetBankC(VRAM_C_LCD);
-	dmaFillWords(0x80008000, (void*)VRAM_C, 256 * 144 * 2);
+	dmaFillWords(0x80008000, (void*)VRAM_A, 256 * VIDEO_HEIGHT * 2);
+	dmaFillWords(0x80008000, (void*)VRAM_B, 256 * VIDEO_HEIGHT * 2);
+	dmaFillWords(0x80008000, (void*)VRAM_C, 256 * VIDEO_HEIGHT * 2);
 	vramSetBankC(VRAM_C_MAIN_BG_0x06000000);
 	bgInit(2, BgType_Bmp8, BgSize_B16_256x256, 0,0);
 	bgInit(3, BgType_Bmp8, BgSize_B16_256x256, 0,0);
@@ -345,25 +355,25 @@ ITCM_CODE void PlayVideo()
 	REG_BG2PA = mpeg4DecStruct.width == 256 ? 256 : 176;
 	REG_BG2PB = 0;
 	REG_BG2PC = 0;
-	REG_BG2PD = 256;
-	REG_BG2X = 0;
-	REG_BG2Y = -24 << 8;
+	REG_BG2PD = sVideoWidthScale;
+	REG_BG2X = 80;
+	REG_BG2Y = -(int)((192-sVideoHeight*(256/(float)sVideoWidthScale))/2) << 8;
 
 	if(mpeg4DecStruct.width != 256)
 	{
 		REG_BG3PA = 176;
 		REG_BG3PB = 0;
 		REG_BG3PC = 0;
-		REG_BG3PD = 256;
+		REG_BG3PD = sVideoWidthScale;
 		REG_BG3X = 80;
-		REG_BG3Y = -24 << 8;
+		REG_BG3Y = -(int)((192-sVideoHeight*(256/(float)sVideoWidthScale))/2) << 8;
 		REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_SRC_BG3 | BLEND_DST_BG2 | BLEND_DST_BG3 | BLEND_DST_BACKDROP;
 		REG_BLDALPHA = 8 | (8 << 8);
 	}
 	else
 		REG_BLDCNT = 0;
 
-	
+
 
 	aac_initQueue();
 #ifdef AAC_ARM7
@@ -384,18 +394,34 @@ ITCM_CODE void PlayVideo()
 #endif
 	stopVideo = FALSE;
 	mTimeScale = timescale;
-	
-	int frame = 0;
+
 	StartTimer(timescale);
-	int keytimer = 0;
+	pauseVideo = false;
 	while((!stopVideo || frame < 20) && frame < nrframes)
 	{
-		if(frame < nrframes && offset == nextAudioBlockOffset)
+		if(skip)
+		{
+			if(frame+skip > 0)
+			{
+				videoBlockOffsets += 4*skip;
+				audioBlockOffsets += 4*skip;
+				framesizes += 4*skip;
+				nextAudioBlockOffset = READ_SAFE_UINT32_BE(audioBlockOffsets-4);
+				offset = READ_SAFE_UINT32_BE(videoBlockOffsets);
+				fseek(video, nextAudioBlockOffset, SEEK_SET);
+				frame += skip;
+			}
+			skip = 0;
+			continue;
+		}
+		
+		if(pauseVideo)	continue;
+		if(frame < nrframes)
 		{
 			offset = READ_SAFE_UINT32_BE(videoBlockOffsets);
 			int audiosize = offset - nextAudioBlockOffset;
-			videoBlockOffsets += 4;		
-			
+			videoBlockOffsets += 4;
+
 #ifdef AAC_ARM7
 			while(sAACQueueUncached->blockCount == AAC_QUEUE_BLOCK_COUNT);
 			fread(&sAACQueue.queue[sAACQueueUncached->writeBlock][0], 1, audiosize, video);
@@ -416,10 +442,10 @@ ITCM_CODE void PlayVideo()
 			while(audiosize > 0)
 			{
 				int err = 0;
-				if((err = AACDecode(aacDec, &audioDataptr, &audiosize, &mWaveData[mWaveDataOffs_write * AUDIO_BLOCK_SIZE])) < 0) 
+				if((err = AACDecode(aacDec, &audioDataptr, &audiosize, &mWaveData[mWaveDataOffs_write * AUDIO_BLOCK_SIZE])) < 0)
 				{
 					break;
-				}				
+				}
 				DC_FlushRange(&mWaveData[mWaveDataOffs_write * AUDIO_BLOCK_SIZE], AUDIO_BLOCK_SIZE * 2);
 				mWaveDataOffs_write = (mWaveDataOffs_write + 1) % NR_WAVE_DATA_BUFFERS;
 			}
@@ -457,11 +483,11 @@ ITCM_CODE void PlayVideo()
 		mpeg4DecStruct.pPrevUV = mpeg4DecStruct.pDstUV;
 		mpeg4DecStruct.pDstY = &mYBuffer[lastQueueBlock][0];
 		mpeg4DecStruct.pDstUV = &mUVBuffer[lastQueueBlock][0];
-		for(uint q = 0; q < sizeof(mYDCCoefCache) / sizeof(mYDCCoefCache[0]); q++)
+		for(unsigned int q = 0; q < sizeof(mYDCCoefCache) / sizeof(mYDCCoefCache[0]); q++)
 			mYDCCoefCache[q] = 1024;
-		for(uint q = 0; q < sizeof(mUVDCCoefCache) / sizeof(mUVDCCoefCache[0]); q++)
+		for(unsigned int q = 0; q < sizeof(mUVDCCoefCache) / sizeof(mUVDCCoefCache[0]); q++)
 			mUVDCCoefCache[q] = 1024;
-		for(uint q = 0; q < sizeof(mMVecCache) / sizeof(mMVecCache[0]); q++)
+		for(unsigned int q = 0; q < sizeof(mMVecCache) / sizeof(mMVecCache[0]); q++)
 			mMVecCache[q] = 0;
 		if(mpeg4DecStruct.pData[2] == 1 && mpeg4DecStruct.pData[3] == 0xB3)
 			mpeg4DecStruct.pData += 7;
@@ -473,7 +499,7 @@ ITCM_CODE void PlayVideo()
 		//cpuStartTiming(1);
 		mpeg4_VideoObjectPlane(&mpeg4DecStruct);
 		// u32 timing = cpuEndTiming();
-		// iprintf("%d\n", timing);
+		// printf("%d\n", timing);
 		// if(frame == 20)
 		// {
 		// 	enterCriticalSection();
@@ -503,7 +529,7 @@ ITCM_CODE void PlayVideo()
 			while(audiosize > 0)
 			{
 				int err = 0;
-				if((err = AACDecode(aacDec, &audioDataptr, &audiosize, &mWaveData[mWaveDataOffs_write * AUDIO_BLOCK_SIZE])) < 0) 
+				if((err = AACDecode(aacDec, &audioDataptr, &audiosize, &mWaveData[mWaveDataOffs_write * AUDIO_BLOCK_SIZE])) < 0)
 				{
 					break;
 				}
@@ -538,7 +564,7 @@ ITCM_CODE void PlayVideo()
 		//	mTestAdapter->DoFrameProc();
 		if(frame < 20) stopVideo = FALSE;
 	}
-video_stop:
+// video_stop:
 	timerStop(0);
 	REG_DISPCNT &= ~(DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
 	DMA0_CR = 0;
@@ -556,120 +582,109 @@ video_stop:
 #endif
 	fclose(video);
 	free(mVideoHeader);
-}
 
-static int state = 0;
-static int state_counter = 0;
+	// Mark video as watched
+	std::vector<std::string> watchedList = watchedListGet();
+	watchedListAdd(watchedList, fileName);
+	watchedListSave(watchedList);
+}
 
 static std::string mSearchString;
-static int mSearchStringInvalidated;
-static int mSearchStringCursorPosition;
 
-static void OnToolbarButtonClick(void* context, int button)
-{
-	if(state == 0 && button == TOOLBAR_BUTTON_SEARCH)
-	{
-		state = 1;
-		state_counter = 0;
-	}
-	else if((state == 2 || state == 5) && button == TOOLBAR_BUTTON_BACK)
-	{
-		state = 3;
-		state_counter = 0;
-	}
-	else if(state == 2 && button == TOOLBAR_BUTTON_CLEAR)
-	{
-		mSearchStringCursorPosition = 0;
-		mSearchString.erase();
-		mSearchStringInvalidated = TRUE;
-	}
-}
-
-static void OnKeyboardButtonClick(void* context, int button)
-{
-	if(button & (1 << 16)) //special
-	{
-		if(button == SCREENKEYBOARD_BUTTON_SPECIAL_BACKSPACE && mSearchStringCursorPosition > 0)
-		{
-			mSearchStringCursorPosition--;
-			mSearchString.erase(mSearchStringCursorPosition, 1);
-			mSearchStringInvalidated = TRUE;
-		}
-		else if(button == SCREENKEYBOARD_BUTTON_SPECIAL_SEARCH)
-		{
-			if(mSearchString.length() > 0 && mSearchString.find_first_not_of(' ') != std::string::npos)
-			{
-				state = 4;
-				state_counter = 0;
-			}
-		}
-		return;
-	}
-	mSearchString.insert(mSearchStringCursorPosition, 1, (char)button);
-	mSearchStringCursorPosition++;
-	mSearchStringInvalidated = TRUE;
-}
-
-static int mTextCursorBlinking;
-static int mTextCursorCounter;
 static int mKeyTimer = 0;
 
 static bool mUseVramB = false;
 static bool mCopyDone = false;
 
-static bool mFilterFrame = true;
-
 ITCM_CODE void VBlankProc()
 {
 	if(isVideoPlaying)//stride dma and frame copy
 	{
-		if(mCopyDone)
+		if(!pauseVideo)
 		{
-			mCopyDone = false;
-			if(mUseVramB)
+			if(mCopyDone)
 			{
-				vramSetBankA(VRAM_A_LCD);
-				vramSetBankB(VRAM_B_MAIN_BG_0x06000000);
-			}
-			else
-			{
-				vramSetBankA(VRAM_A_MAIN_BG_0x06000000);
-				vramSetBankB(VRAM_B_LCD);
-			}
-			mUseVramB = !mUseVramB;
-		}
-		if(mShouldCopyFrame)
-		{
-			mShouldCopyFrame = FALSE;
-			if(nrFramesInQueue > 0)
-			{
-				void* addr = mUseVramB ? VRAM_B : VRAM_A;
-				//cpuStartTiming(1);
-				if(sVideoWidth == 256)
-					yog2rgb_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+				mCopyDone = false;
+				if(mUseVramB)
+				{
+					vramSetBankA(VRAM_A_LCD);
+					vramSetBankB(VRAM_B_MAIN_BG_0x06000000);
+				}
 				else
-					yog2rgb_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);				
-				// if(sVideoWidth == 256)
-				// 	y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
-				// else
-				// 	y2r_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
-				//u32 timing = cpuEndTiming();
-				//iprintf("%d\n", timing);
-				DC_FlushRange(addr, FRAME_SIZE * 2);
-				mCopyDone = true;
+				{
+					vramSetBankA(VRAM_A_MAIN_BG_0x06000000);
+					vramSetBankB(VRAM_B_LCD);
+				}
+				mUseVramB = !mUseVramB;
 			}
-			else
+			if(mShouldCopyFrame)
 			{
-				iprintf("Skip\n");
-				//dmaFillWords(0x801F801F, (void*)&BG_GFX[0], FRAME_SIZE * 2);
-			}			
-			curBlock = firstQueueBlock;
-			firstQueueBlock = (firstQueueBlock + 1) % NR_FRAME_BLOCKS;
-			nrFramesInQueue--;
+				mShouldCopyFrame = FALSE;
+				if(nrFramesInQueue > 0)
+				{
+					u16* addr = mUseVramB ? VRAM_B : VRAM_A;
+					//cpuStartTiming(1);
+					if(sVideoHeight == 192)
+						yog2rgb_convert192(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], addr);
+					else if(sVideoWidth == 256)
+						yog2rgb_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], addr);
+					else
+						yog2rgb_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], addr);
+					// if(sVideoWidth == 256)
+					// 	y2r_convert256(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+					// else
+					// 	y2r_convert176(&mYBuffer[firstQueueBlock][0], &mUVBuffer[firstQueueBlock][0], (u16*)addr);
+					//u32 timing = cpuEndTiming();
+					//iprintf("%d\n", timing);
+					DC_FlushRange(addr, FRAME_SIZE * 2);
+					mCopyDone = true;
+				}
+				else
+				{
+					printf("Skip\n");
+					//dmaFillWords(0x801F801F, (void*)&BG_GFX[0], FRAME_SIZE * 2);
+				}
+				curBlock = firstQueueBlock;
+				firstQueueBlock = (firstQueueBlock + 1) % NR_FRAME_BLOCKS;
+				nrFramesInQueue--;
+			} else {
+				// Update time & progress if not copying a frame
+				drawRectangle(36, 7, (int)(((float)frame/nrframes)*184), 5, 4);
+				char time[14];
+				snprintf(time, sizeof(time), "%.02d:%.02d", frame/(mTimeScale/1000)/60, (frame/(mTimeScale/1000))-((frame/(mTimeScale/1000)/60)*60));
+				drawRectangle(3, 1, 30, 16, 0);
+				printText(time, 1, 1, 1, 3, 1);
+			}
 		}
 
 		scanKeys();
-		if(keysDown() & KEY_B)	stopVideo = true;
+		u16 pressed = keysDown();
+		u16 held = keysDownRepeat();
+		if(pressed & KEY_A) {
+			pauseVideo = !pauseVideo;
+			// if(pauseVideo)
+			aac_pauseDecArm7();
+			// else {
+			// 	aac_startDecArm7(audioRate);
+			// }
+		} else if(pressed & KEY_B) {
+			stopVideo = true;
+		} else if(held & KEY_RIGHT) {
+			skip = 24*5;
+		} else if(held & KEY_LEFT) {
+			skip = -24*5;
+			drawBar:
+			drawRectangle(35, 6, 185, 7, 5);
+			drawRectangle(36, 7, (int)(((float)frame/nrframes)*184), 5, 4);
+		} else if(held & KEY_TOUCH) {
+			touchPosition touch;
+			touchRead(&touch);
+			if(touch.py < 16 && touch.px > 35 && touch.px < 220) {
+				int newpos = nrframes*((float)(touch.px-35)/183);
+				skip = newpos-frame;
+				goto drawBar; // overflowed itcm with it copied 
+			}
+		}
 	}
 	else
 		mKeyTimer = 0;
@@ -686,10 +701,14 @@ int main()
 		nitroFSInit(NULL);
 	//defaultExceptionHandler();
 	//consoleDemoInit();
+	videoSetMode(MODE_0_2D);
 	videoSetModeSub(MODE_0_2D);
 	vramSetBankH(VRAM_H_SUB_BG);
 
-	consoleInit(NULL, 0, BgType_Text4bpp, BgSize_T_256x256, 2, 0, false, true);
+	loadFont();
+	loadPalettes();
+
+	// consoleInit(NULL, 0, BgType_Text4bpp, BgSize_T_256x256, 2, 0, false, true);
 	//if(nitroFSInit(NULL))
 	//	printf("NitroFS works\n");
 	keysSetRepeat(25, 5);
@@ -831,11 +850,11 @@ idle_loop:
 #endif
 /*#ifdef USE_WIFI
 	consoleDemoInit();
-	if(!Wifi_InitDefault(WFC_CONNECT)) 
+	if(!Wifi_InitDefault(WFC_CONNECT))
 	{
-		iprintf("Failed to connect!");
-	} 
-	iprintf("Connected\n\n");
+		printf("Failed to connect!");
+	}
+	printf("Connected\n\n");
 	swiWaitForVBlank();
 	swiWaitForVBlank();
 	//YT_SearchListResponse* response = YT_Search("grand dad", NULL);

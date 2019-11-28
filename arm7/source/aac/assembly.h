@@ -61,7 +61,7 @@
 
 #pragma warning( disable : 4035 )       /* complains about inline asm not returning a value */
 
-static __inline int MULSHIFT32(int x, int y)    
+static __inline int MULSHIFT32(int x, int y)
 {
     __asm {
                 mov             eax, x
@@ -325,7 +325,7 @@ static __inline Word64 MADD64(Word64 sum64, int x, int y)
 {
         U64 u;
         u.w64 = sum64;
-        
+
         __asm {
         smlal u.r.lo32, u.r.hi32, x, y
         }
@@ -399,9 +399,9 @@ static __inline Word64 MADD64(Word64 sum64, int x, int y)
 {
         U64 u;
         u.w64 = sum64;
-        
+
         __asm__ volatile ("smlal %0,%1,%2,%3" : "+&r" (u.r.lo32), "+&r" (u.r.hi32) : "r" (x), "r" (y) : "cc");
-        
+
         return u.w64;
 }
 

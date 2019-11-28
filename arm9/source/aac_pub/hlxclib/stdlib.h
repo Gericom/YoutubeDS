@@ -1,8 +1,8 @@
 /* ***** BEGIN LICENSE BLOCK *****
  * Source last modified: $Id: stdlib.h,v 1.10 2004/07/09 18:21:09 hubbe Exp $
- * 
+ *
  * Portions Copyright (c) 1995-2004 RealNetworks, Inc. All Rights Reserved.
- * 
+ *
  * The contents of this file, and the files included with this file,
  * are subject to the current version of the RealNetworks Public
  * Source License (the "RPSL") available at
@@ -16,7 +16,7 @@
  * to this file, the RCSL.  Please see the applicable RPSL or RCSL for
  * the rights, obligations and limitations governing use of the
  * contents of the file.
- * 
+ *
  * Alternatively, the contents of this file may be used under the
  * terms of the GNU General Public License Version 2 or later (the
  * "GPL") in which case the provisions of the GPL are applicable
@@ -28,23 +28,23 @@
  * the GPL. If you do not delete the provisions above, a recipient may
  * use your version of this file under the terms of any one of the
  * RPSL, the RCSL or the GPL.
- * 
+ *
  * This file is part of the Helix DNA Technology. RealNetworks is the
  * developer of the Original Code and owns the copyrights in the
  * portions it created.
- * 
+ *
  * This file, and the files included with this file, is distributed
  * and made available on an 'AS IS' basis, WITHOUT WARRANTY OF ANY
  * KIND, EITHER EXPRESS OR IMPLIED, AND REALNETWORKS HEREBY DISCLAIMS
  * ALL SUCH WARRANTIES, INCLUDING WITHOUT LIMITATION, ANY WARRANTIES
  * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, QUIET
  * ENJOYMENT OR NON-INFRINGEMENT.
- * 
+ *
  * Technology Compatibility Kit Test Suite(s) Location:
  *    http://www.helixcommunity.org/content/tck
- * 
+ *
  * Contributor(s):
- * 
+ *
  * ***** END LICENSE BLOCK ***** */
 
 #ifndef HLXSYS_STDLIB_H
@@ -77,9 +77,9 @@
 char* __helix_itoa(int val, char *str, int radix);
 char* __helix_i64toa(INT64 val, char *str, int radix);
 INT64 __helix_atoi64(char* str);
-void* __helix_bsearch( const void *key, const void *base, size_t num, 
-		       size_t width, 
-		       int (  *compare ) ( const void *elem1, 
+void* __helix_bsearch( const void *key, const void *base, size_t num,
+		       size_t width,
+		       int (  *compare ) ( const void *elem1,
 					   const void *elem2 ) );
 int __helix_remove(const char* pPath);
 int __helix_putenv(const char* pStr);
@@ -112,9 +112,9 @@ char* getenv(const char* pName)
 #define itoa __helix_itoa
 
 _inline
-void* bsearch( const void *key, const void *base, size_t num, 
-	       size_t width, 
-	       int ( *compare ) ( const void *elem1, 
+void* bsearch( const void *key, const void *base, size_t num,
+	       size_t width,
+	       int ( *compare ) ( const void *elem1,
 				  const void *elem2 ) )
 {
     return __helix_bsearch(key, base, num, width, compare);
@@ -128,7 +128,7 @@ atoi64(const char* str)
 }
 #endif /* _WINDOWS */
 
-#if defined (_MACINTOSH) 
+#if defined (_MACINTOSH)
 
 #define itoa __helix_itoa
 #define i64toa __helix_i64toa
