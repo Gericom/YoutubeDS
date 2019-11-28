@@ -14,6 +14,6 @@ void watchedListAdd(std::vector<std::string> &watchedList, std::string item);
 void watchedListRemove(std::vector<std::string> &watchedList, std::string item);
 void watchedListSave(const std::vector<std::string> &watchedList);
 
-std::string browseForFile(void);
+std::string browseForFile(const std::vector<std::string>& extensionList);
 
 #endif //FILE_BROWSE_H

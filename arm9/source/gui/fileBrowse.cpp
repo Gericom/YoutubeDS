@@ -7,9 +7,12 @@
 #include <strings.h>
 #include <unistd.h>
 
+#include "graphics.h"
+
+#include "fileBrowseBg.h"
 
 #define SCREEN_COLS 22
-#define ENTRIES_PER_SCREEN 23
+#define ENTRIES_PER_SCREEN 11
 #define ENTRIES_START_ROW 1
 #define OPTIONS_ENTRIES_START_ROW 2
 #define ENTRY_PAGE_LENGTH 10
@@ -48,7 +51,7 @@ void getDirectoryContents(std::vector<DirEntry>& dirContents, const std::vector<
 	DIR *pdir = opendir(".");
 
 	if(pdir == NULL) {
-		printf("Unable to open the directory.\n");
+		printText("Unable to open the directory.", 1, 1, 0, 0, 0);
 	} else {
 		while(true) {
 			DirEntry dirEntry;
@@ -58,9 +61,9 @@ void getDirectoryContents(std::vector<DirEntry>& dirContents, const std::vector<
 
 			stat(pent->d_name, &st);
 			dirEntry.name = pent->d_name;
-			dirEntry.isDirectory =(st.st_mode & S_IFDIR) ? true : false;
+			dirEntry.isDirectory = (st.st_mode & S_IFDIR) ? true : false;
 
-			if(dirEntry.name.compare(".") != 0 &&(dirEntry.isDirectory || nameEndsWith(dirEntry.name, extensionList))) {
+			if(dirEntry.name.compare(".") != 0 && (dirEntry.isDirectory || nameEndsWith(dirEntry.name, extensionList))) {
 				dirContents.push_back(dirEntry);
 			}
 		}
@@ -118,121 +121,104 @@ void watchedListSave(const std::vector<std::string> &watchedList) {
 	fclose(list);
 }
 
-void showDirectoryContents(const std::vector<DirEntry>& dirContents, const std::vector<std::string>& watchedList, int fileOffset, int startRow) {
+void showDirectoryContents(const std::vector<DirEntry>& dirContents, const std::vector<std::string> &watchedList, int selection, int startRow) {
 	getcwd(path, PATH_MAX);
 
-	// Clear the screen
-	printf("\x1b[2J");
-
-	// Print the path
-	printf("\x1B[42m");	// Print green color
-	printf("________________________________");
-	printf("\x1b[0;0H");
-	if(strlen(path) < SCREEN_COLS) {
-		printf("%s", path);
-	} else {
-		printf("%s", path + strlen(path) - SCREEN_COLS);
-	}
-
-	// Move to 2nd row
-	printf("\x1b[1;0H");
+	// Print path
+	drawImageSection(0, 0, 256, 17, fileBrowseBgBitmap, 256, 0, 0, 16);
+	printTextMaxW(path, 250, 1, 0, 3, 0);
 
 	// Print directory listing
-	for(int i = 0; i < (int)(dirContents.size() - startRow) && i < ENTRIES_PER_SCREEN; i++) {
-		const DirEntry* entry = &dirContents.at(i + startRow);
+	for(int i=0;i < ENTRIES_PER_SCREEN; i++) {
+		// Clear row
+		drawImageSection(0, i*16+16, 256, 16, fileBrowseBgBitmap, 256, 0, i*16+16, 16);
 
-		bool watched = false;
-		for(unsigned int i=0;i<watchedList.size();i++) {
-			if(watchedList[i] == entry->name) {
-				watched = true;
-				break;
+		if(i < ((int)dirContents.size() - startRow)) {
+			const DirEntry *entry = &dirContents.at(startRow+i);
+			std::u16string name = UTF8toUTF16(entry->name);
+
+			// Trim to fit on screen
+			bool addEllipsis = false;
+			while(getTextWidth(name) > 240) {
+				name = name.substr(0, name.length()-1);
+				addEllipsis = true;
 			}
-		}
+			if(addEllipsis)	name += UTF8toUTF16("...");
 
-		printf("\x1b[%d;0H", i + ENTRIES_START_ROW); // Set row
-		if((fileOffset - startRow) == i) {
-			printf("\x1B[%im", watched ? 45 : 47);	// Print foreground color
-		} else {
-			printf("\x1B[%im", watched ? 35 : 40);	// Print foreground color
-		}
+			bool watched = false;
+			if(!entry->isDirectory) {
+				for(unsigned int j=0;j<watchedList.size();j++) {
+					if(watchedList[j] == entry->name) {
+						watched = true;
+						break;
+					}
+				}
+			}
 
-		if(entry->isDirectory) {
-			printf("[%s]", entry->name.substr(0, SCREEN_COLS).c_str());
-		} else {
-			printf("%s", entry->name.substr(0, SCREEN_COLS).c_str());
+			printText(name, 1, 1, !(startRow+i == selection) + (watched*2), 3, i*16+16);
 		}
 	}
-
-	printf("\x1B[47m");	// Print foreground white color
 }
 
-std::string browseForFile(void) {
+std::string browseForFile(const std::vector<std::string>& extensionList) {
+	videoSetModeSub(MODE_5_2D | DISPLAY_BG3_ACTIVE);
+	vramSetBankC(VRAM_C_SUB_BG);
+	bgInitSub(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
+
 	int pressed = 0, held = 0, screenOffset = 0, fileOffset = 0;
+	touchPosition touch;
 	std::vector<DirEntry> dirContents;
 	std::vector<std::string> watchedList = watchedListGet();
 
-	getDirectoryContents(dirContents, {"mp4"});
+	drawImage(0, 0, 256, 192, fileBrowseBgBitmap, 16);
 
-	while(true) {
-		showDirectoryContents(dirContents, watchedList, fileOffset, screenOffset);
+	getDirectoryContents(dirContents, extensionList);
+	showDirectoryContents(dirContents, watchedList, fileOffset, screenOffset);
 
+	while(1) {
 		// Power saving loop. Only poll the keys once per frame and sleep the CPU if there is nothing else to do
 		do {
+			swiWaitForVBlank();
 			scanKeys();
 			pressed = keysDown();
 			held = keysDownRepeat();
-			swiWaitForVBlank();
-		} while(!((pressed & (KEY_A | KEY_B | KEY_Y)) || (held & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT))));
+		} while(!((held & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT) || (pressed & (KEY_A | KEY_B | KEY_Y | KEY_TOUCH)))));
 
-		printf("\x1B[47m");		// Print foreground white color
-		printf("\x1b[%d;0H", fileOffset - screenOffset + ENTRIES_START_ROW);
-
-		if(held & KEY_UP) { 
-			if(fileOffset > 0)	fileOffset--;
-			else	fileOffset = dirContents.size()-1;
+		if(held & KEY_UP) {
+			fileOffset -= 1;
+			if(fileOffset < 0)	fileOffset = dirContents.size()-1;
 		} else if(held & KEY_DOWN) {
-			if(fileOffset < (int)dirContents.size()-1)	fileOffset++;
-			else	fileOffset = 0;
+			fileOffset += 1;
+			if(fileOffset > (int)dirContents.size()-1)	fileOffset = 0;
 		} else if(held & KEY_LEFT) {
 			fileOffset -= ENTRY_PAGE_LENGTH;
 			if(fileOffset < 0)	fileOffset = 0;
 		} else if(held & KEY_RIGHT) {
 			fileOffset += ENTRY_PAGE_LENGTH;
 			if(fileOffset > (int)dirContents.size()-1)	fileOffset = dirContents.size()-1;
-		}
-
-		// Scroll screen if needed
-		if(fileOffset < screenOffset) {
-			screenOffset = fileOffset;
-			showDirectoryContents(dirContents, watchedList, fileOffset, screenOffset);
-		}
-		if(fileOffset > screenOffset + ENTRIES_PER_SCREEN - 1) {
-			screenOffset = fileOffset - ENTRIES_PER_SCREEN + 1;
-			showDirectoryContents(dirContents, watchedList, fileOffset, screenOffset);
-		}
-
-		if(pressed & KEY_A) {
+		} else if(pressed & KEY_A) {
+			selection:
 			DirEntry* entry = &dirContents.at(fileOffset);
 			if(entry->isDirectory) {
-				printf("Entering directory\n");
 				// Enter selected directory
 				chdir(entry->name.c_str());
-				getDirectoryContents(dirContents, {"mp4"});
-				watchedList = watchedListGet();
+				getDirectoryContents(dirContents, extensionList);
 				screenOffset = 0;
 				fileOffset = 0;
-			} else {
+				watchedList = watchedListGet();
+			} else if(!entry->isDirectory) {
+				// Sound::play(Sound::click);
+				// Return the chosen file
 				return entry->name;
 			}
 		} else if(pressed & KEY_B) {
-			getcwd(path, PATH_MAX);
-			if(!((strcmp(path, "sd:/") == 0) || (strcmp(path, "fat:/") == 0) || (strcmp(path, "nitro:/") == 0))) {
-				// Go up a directory
+			// Go up a directory
+			if(!((strcmp (path, "sd:/") == 0) || (strcmp (path, "fat:/") == 0))) {
 				chdir("..");
-				getDirectoryContents(dirContents, {"mp4"});
-				watchedList = watchedListGet();
+				getDirectoryContents(dirContents, extensionList);
 				screenOffset = 0;
 				fileOffset = 0;
+				watchedList = watchedListGet();
 			}
 		} else if(pressed & KEY_Y) {
 			DirEntry* entry = &dirContents.at(fileOffset);
@@ -248,6 +234,23 @@ std::string browseForFile(void) {
 				else	watchedListAdd(watchedList, entry->name);
 				watchedListSave(watchedList);
 			}
+		} else if(pressed & KEY_TOUCH) {
+			touchRead(&touch);
+			for(int i=0;i<std::min(ENTRIES_PER_SCREEN, (int)dirContents.size());i++) {
+				if(touch.py > (i+1)*16 && touch.py < (i+2)*16) {
+					fileOffset = i;
+					goto selection;
+				}
+			}
 		}
+
+		// Scroll screen if needed
+		if(fileOffset < screenOffset) {
+			screenOffset = fileOffset;
+		} else if(fileOffset > screenOffset + ENTRIES_PER_SCREEN - 1) {
+			screenOffset = fileOffset - ENTRIES_PER_SCREEN + 1;
+		}
+
+		showDirectoryContents(dirContents, watchedList, fileOffset, screenOffset);
 	}
 }

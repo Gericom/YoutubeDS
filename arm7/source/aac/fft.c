@@ -1,39 +1,39 @@
-/* ***** BEGIN LICENSE BLOCK *****  
- * Source last modified: $Id: fft.c,v 1.1 2005/02/26 01:47:34 jrecker Exp $ 
- *   
- * Portions Copyright (c) 1995-2005 RealNetworks, Inc. All Rights Reserved.  
- *       
- * The contents of this file, and the files included with this file, 
- * are subject to the current version of the RealNetworks Public 
- * Source License (the "RPSL") available at 
- * http://www.helixcommunity.org/content/rpsl unless you have licensed 
- * the file under the current version of the RealNetworks Community 
- * Source License (the "RCSL") available at 
- * http://www.helixcommunity.org/content/rcsl, in which case the RCSL 
- * will apply. You may also obtain the license terms directly from 
- * RealNetworks.  You may not use this file except in compliance with 
- * the RPSL or, if you have a valid RCSL with RealNetworks applicable 
- * to this file, the RCSL.  Please see the applicable RPSL or RCSL for 
- * the rights, obligations and limitations governing use of the 
- * contents of the file. 
- *   
- * This file is part of the Helix DNA Technology. RealNetworks is the 
- * developer of the Original Code and owns the copyrights in the 
- * portions it created. 
- *   
- * This file, and the files included with this file, is distributed 
- * and made available on an 'AS IS' basis, WITHOUT WARRANTY OF ANY 
- * KIND, EITHER EXPRESS OR IMPLIED, AND REALNETWORKS HEREBY DISCLAIMS 
- * ALL SUCH WARRANTIES, INCLUDING WITHOUT LIMITATION, ANY WARRANTIES 
- * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, QUIET 
- * ENJOYMENT OR NON-INFRINGEMENT. 
- *  
- * Technology Compatibility Kit Test Suite(s) Location:  
- *    http://www.helixcommunity.org/content/tck  
- *  
- * Contributor(s):  
- *   
- * ***** END LICENSE BLOCK ***** */  
+/* ***** BEGIN LICENSE BLOCK *****
+ * Source last modified: $Id: fft.c,v 1.1 2005/02/26 01:47:34 jrecker Exp $
+ *
+ * Portions Copyright (c) 1995-2005 RealNetworks, Inc. All Rights Reserved.
+ *
+ * The contents of this file, and the files included with this file,
+ * are subject to the current version of the RealNetworks Public
+ * Source License (the "RPSL") available at
+ * http://www.helixcommunity.org/content/rpsl unless you have licensed
+ * the file under the current version of the RealNetworks Community
+ * Source License (the "RCSL") available at
+ * http://www.helixcommunity.org/content/rcsl, in which case the RCSL
+ * will apply. You may also obtain the license terms directly from
+ * RealNetworks.  You may not use this file except in compliance with
+ * the RPSL or, if you have a valid RCSL with RealNetworks applicable
+ * to this file, the RCSL.  Please see the applicable RPSL or RCSL for
+ * the rights, obligations and limitations governing use of the
+ * contents of the file.
+ *
+ * This file is part of the Helix DNA Technology. RealNetworks is the
+ * developer of the Original Code and owns the copyrights in the
+ * portions it created.
+ *
+ * This file, and the files included with this file, is distributed
+ * and made available on an 'AS IS' basis, WITHOUT WARRANTY OF ANY
+ * KIND, EITHER EXPRESS OR IMPLIED, AND REALNETWORKS HEREBY DISCLAIMS
+ * ALL SUCH WARRANTIES, INCLUDING WITHOUT LIMITATION, ANY WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, QUIET
+ * ENJOYMENT OR NON-INFRINGEMENT.
+ *
+ * Technology Compatibility Kit Test Suite(s) Location:
+ *    http://www.helixcommunity.org/content/tck
+ *
+ * Contributor(s):
+ *
+ * ***** END LICENSE BLOCK ***** */
 
 /**************************************************************************************
  * Fixed-point HE-AAC decoder
@@ -76,7 +76,7 @@ static void BitReverse(int *inout, int tabidx)
 
 	part0 = inout;
     part1 = inout + (1 << nbits);
-	
+
 	while ((a = *tab++) != 0) {
         b = *tab++;
 
@@ -103,13 +103,13 @@ static void BitReverse(int *inout, int tabidx)
  *
  * Return:      none
  *
- * Notes:       assumes 2 guard bits, gains no integer bits, 
+ * Notes:       assumes 2 guard bits, gains no integer bits,
  *                guard bits out = guard bits in - 2
  **************************************************************************************/
 static void R4FirstPass(int *x, int bg)
 {
     int ar, ai, br, bi, cr, ci, dr, di;
-	
+
 	for (; bg != 0; bg--) {
 
 		ar = x[0] + x[2];
@@ -188,7 +188,7 @@ static void R8FirstPass(int *x, int bg)
 		di = x[13] - x[15];
 
 		/* max gain of wr/wi/yr/yi vs input = 2
-		 *  (sum of 4 samples >> 1) 
+		 *  (sum of 4 samples >> 1)
 		 */
 		wr = (ar + cr) >> 1;
 		yr = (ar - cr) >> 1;
@@ -196,7 +196,7 @@ static void R8FirstPass(int *x, int bg)
 		yi = (ai - ci) >> 1;
 
 		/* max gain of output vs input = 4
-		 *  (sum of 4 samples >> 1 + sum of 4 samples >> 1) 
+		 *  (sum of 4 samples >> 1 + sum of 4 samples >> 1)
 		 */
 		x[ 0] = (sr >> 1) + wr;
 		x[ 8] = (sr >> 1) - wr;
@@ -213,7 +213,7 @@ static void R8FirstPass(int *x, int bg)
 		ci = bi - dr;
 
 		/* max gain of xr/xi/zr/zi vs input = 4*sqrt(2)/2 = 2*sqrt(2)
-		 *  (sum of 8 samples, multiply by sqrt(2)/2, implicit >> 1 from Q31) 
+		 *  (sum of 8 samples, multiply by sqrt(2)/2, implicit >> 1 from Q31)
 		 */
 		xr = MULSHIFT32(SQRT1_2, ar - ai);
 		xi = MULSHIFT32(SQRT1_2, ar + ai);
@@ -286,7 +286,7 @@ static void R4Core(int *x, int bg, int gp, int *wtab)
 				ar = xptr[0];
 				ai = xptr[1];
 				xptr += step;
-				
+
 				/* gain 2 int bits for br/bi, cr/ci, dr/di (MULSHIFT32 by Q30)
 				 * gain 1 net GB
 				 */
@@ -299,7 +299,7 @@ static void R4Core(int *x, int bg, int gp, int *wtab)
 				br = MULSHIFT32(wd, br) - tr;	/* cos*br + sin*bi */
 				bi = MULSHIFT32(ws, bi) + tr;	/* cos*bi - sin*br */
 				xptr += step;
-				
+
 				ws = wptr[2];
 				wi = wptr[3];
 				cr = xptr[0];
@@ -309,7 +309,7 @@ static void R4Core(int *x, int bg, int gp, int *wtab)
 				cr = MULSHIFT32(wd, cr) - tr;
 				ci = MULSHIFT32(ws, ci) + tr;
 				xptr += step;
-				
+
 				ws = wptr[4];
 				wi = wptr[5];
 				dr = xptr[0];

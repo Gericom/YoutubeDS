@@ -1,0 +1,3 @@
+-gb  # Bitmap
+-gB8 # Bit depth 8
+-gu8 # u8 array

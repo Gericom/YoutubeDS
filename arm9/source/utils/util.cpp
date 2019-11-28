@@ -18,12 +18,12 @@ void Util_ConvertToObj(uint8_t* src, int width, int height, int stride, uint16_t
 			for (int y2 = 0; y2 < 8; y2++)
 			{
 				//write in 32 bit units for vram compatibility
-				*((uint32_t*)dst) = 
-					(1 + (src[0] * 14 + 128) / 256) | 
+				*((uint32_t*)dst) =
+					(1 + (src[0] * 14 + 128) / 256) |
 					((1 + (src[1] * 14 + 128) / 256) << 4) |
 					((1 + (src[2] * 14 + 128) / 256) << 8) |
 					((1 + (src[3] * 14 + 128) / 256) << 12) |
-					((1 + (src[4] * 14 + 128) / 256) << 16) | 
+					((1 + (src[4] * 14 + 128) / 256) << 16) |
 					((1 + (src[5] * 14 + 128) / 256) << 20) |
 					((1 + (src[6] * 14 + 128) / 256) << 24) |
 					((1 + (src[7] * 14 + 128) / 256) << 28);

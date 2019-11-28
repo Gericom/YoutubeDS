@@ -5,9 +5,9 @@
 
 static inline uint32_t SWAP_CONSTANT_32(uint32_t a)
 {
-	return ((uint32_t)((((a) >> 24) & 0x00FF) | 
-	          (((a) >>  8) & 0xFF00) | 
-	          (((a) & 0xFF00) <<  8) | 
+	return ((uint32_t)((((a) >> 24) & 0x00FF) |
+	          (((a) >>  8) & 0xFF00) |
+	          (((a) & 0xFF00) <<  8) |
 	          (((a) & 0x00FF) << 24) ));
 }
 

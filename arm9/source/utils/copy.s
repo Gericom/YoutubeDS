@@ -35,7 +35,7 @@ _4:
     mov     r3, r12, lsr #16
     subs    r2, r2, #2
     bcs     _4
-    
+
 _3:
     tst     r2, #1
     bxeq    lr

@@ -358,7 +358,7 @@ function idct_col_put_armv5te
         clip   r2, r2, asr #20
         sub    r3, r3, r5
         ldr    r4, [sp, #32]
-        clip   r3, r3, asr #20        
+        clip   r3, r3, asr #20
         orr    r1, r1, r12, lsl #8
         strh   r1, [r4]
         add    r1, r4, #2
@@ -437,7 +437,7 @@ function idct_col_add_armv5te
         ldrh   r12, [r5, lr]!
         strh   r1, [lr]
         and    r1, r12, #255
-        aclip  r2, r1, r2, asr #20        
+        aclip  r2, r1, r2, asr #20
         add    r12, r0, r12, lsr #8
         ldrb   r3, [r12, r3, asr #20]
         add    r1, lr, #2
@@ -451,7 +451,7 @@ function idct_col_add_armv5te
         add    r2, r2, r6
         and    r6, r12, #255
         aclip  r1, r6, r1, asr #20
-        sub    r6, r3, r7        
+        sub    r6, r3, r7
         add    r3, r3, r7
         add    r12, r0, r12, lsr #8
         ldrb   r6, [r12, r6, asr #20]
@@ -465,7 +465,7 @@ function idct_col_add_armv5te
         ldmfd  sp!, {r2, r3}
         orr    r1, r1, r12, lsl #8
         strh   r1, [r5]
-        
+
         ldrh   r12, [lr, r4]!
         add    r1, r2, r8
         sub    r2, r2, r8
@@ -487,7 +487,7 @@ function idct_col_add_armv5te
         ldmfd  sp!, {r2, r3}
         orr    r1, r1, r12, lsl #8
         strh   r1, [r5]
-        
+
         ldrh   r12, [lr, r4]!
         add    r1, r2, r10
         sub    r2, r2, r10

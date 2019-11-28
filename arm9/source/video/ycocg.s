@@ -13,9 +13,13 @@ DITHER_COEF_31 = 5
 //r0 = y
 //r1 = uv
 //r2 = out
-.macro gen_yog2rgb fullwidth
+.macro gen_yog2rgb fullwidth fullheight
     stmfd sp!, {r4-r11, lr}
+.if \fullheight
+    ldr lr,= (192*128)
+.else
     ldr lr,= (144*128)
+.endif
     ldr r12,= (ycocg_blittable + 256)
 1:
     ldrh r4, [r1, #(STRIDE >> 1)] //2 co samples
@@ -159,8 +163,12 @@ DITHER_COEF_31 = 5
 
 .global yog2rgb_convert176
 yog2rgb_convert176:
-	gen_yog2rgb 0
+	gen_yog2rgb 0 0
 
 .global yog2rgb_convert256
 yog2rgb_convert256:
-	gen_yog2rgb 1
+	gen_yog2rgb 1 0
+
+.global yog2rgb_convert192
+yog2rgb_convert192:
+	gen_yog2rgb 1 1

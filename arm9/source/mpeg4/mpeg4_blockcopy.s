@@ -39,9 +39,9 @@ mpeg4_blockcopy_16x16_simple:
 	ldr r1, [r0, #mpeg4_dec_struct__pPrevY]
 	bic r4, r12, #1
 	add r1, r8
-	add r1, r11, asr #1	
+	add r1, r11, asr #1
 	add r1, r4, lsl #(STRIDE_SHIFT - 1)
-	ldr r2, [r0, #mpeg4_dec_struct__pDstY]	
+	ldr r2, [r0, #mpeg4_dec_struct__pDstY]
 	mov r3, #16
 	add r2, r8
 	and r4, r11, #1
@@ -55,16 +55,6 @@ mpeg4_blockcopy_16x16_copyloop:
 	ldrb r5, [r1], #1
 	ldrb r6, [r1], #1
 	ldrb r7, [r1], #1
-	
-	orr r4, r5, lsl #8
-	orr r4, r6, lsl #16
-	orr r4, r7, lsl #24
-	str r4, [r2], #4
-
-	ldrb r4, [r1], #1
-	ldrb r5, [r1], #1
-	ldrb r6, [r1], #1
-	ldrb r7, [r1], #1
 
 	orr r4, r5, lsl #8
 	orr r4, r6, lsl #16
@@ -75,7 +65,17 @@ mpeg4_blockcopy_16x16_copyloop:
 	ldrb r5, [r1], #1
 	ldrb r6, [r1], #1
 	ldrb r7, [r1], #1
-	
+
+	orr r4, r5, lsl #8
+	orr r4, r6, lsl #16
+	orr r4, r7, lsl #24
+	str r4, [r2], #4
+
+	ldrb r4, [r1], #1
+	ldrb r5, [r1], #1
+	ldrb r6, [r1], #1
+	ldrb r7, [r1], #1
+
 	orr r4, r5, lsl #8
 	orr r4, r6, lsl #16
 	orr r4, r7, lsl #24
@@ -104,7 +104,7 @@ mpeg4_blockcopy_16x16_copyloop2:
 	bne mpeg4_blockcopy_16x16_copyloop
 	pop {r1-r7,pc}
 
-mpeg4_blockcopy_16x16_halfs:	
+mpeg4_blockcopy_16x16_halfs:
 	ldrb lr, [r0, #mpeg4_dec_struct__vop_rounding_control]
 	cmp r4, #1
 	beq mpeg4_blockcopy_16x16_halfx
@@ -114,8 +114,8 @@ mpeg4_blockcopy_16x16_halfs:
 mpeg4_blockcopy_16x16_halfxy:
 .rept 16
 	ldrb r4, [r1], #1
-	ldrb r5, [r1, #(STRIDE - 1)]	
-	ldrb r6, [r1]	
+	ldrb r5, [r1, #(STRIDE - 1)]
+	ldrb r6, [r1]
 	ldrb r7, [r1, #STRIDE]
 	add r4, r5
 	add r4, r6
@@ -135,7 +135,7 @@ mpeg4_blockcopy_16x16_halfx:
 1:
 .rept 16
 	ldrb r4, [r1], #1
-	ldrb r5, [r1]	
+	ldrb r5, [r1]
 	add r4, lr
 	add r4, r5
 	mov r4, r4, lsr #1
@@ -153,7 +153,7 @@ mpeg4_blockcopy_16x16_halfy:
 1:
 .rept 16
 	ldrb r4, [r1], #1
-	ldrb r5, [r1, #(STRIDE - 1)]	
+	ldrb r5, [r1, #(STRIDE - 1)]
 	add r4, lr
 	add r4, r5
 	mov r4, r4, lsr #1
@@ -243,7 +243,7 @@ mpeg4_blockcopy_8x8_Y:
 	ldr r2, [r0, #mpeg4_dec_struct__pDstY]
 
 mpeg4_blockcopy_8x8_simple:
-	//push {r1-r7,lr}	
+	//push {r1-r7,lr}
 	add r1, r8
 	add r1, r11, asr #1
 	bic r4, r12, #1
@@ -281,7 +281,7 @@ mpeg4_blockcopy_8x8_copyloop2:
 	ldmia r1!, {r4, r5}
 	stmia r2!, {r4, r5}
 	add r1, #(STRIDE - 8)
-	add r2, #(STRIDE - 8)	
+	add r2, #(STRIDE - 8)
 	subs r3, #1
 	bne mpeg4_blockcopy_8x8_Y_copyloop
 	pop {r1-r7,pc}

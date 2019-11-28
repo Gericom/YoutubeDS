@@ -1,39 +1,39 @@
-/* ***** BEGIN LICENSE BLOCK *****  
- * Source last modified: $Id: trigtabs_fltgen.c,v 1.2 2006/12/05 03:36:53 ehyche Exp $ 
- *   
- * Portions Copyright (c) 1995-2005 RealNetworks, Inc. All Rights Reserved.  
- *       
- * The contents of this file, and the files included with this file, 
- * are subject to the current version of the RealNetworks Public 
- * Source License (the "RPSL") available at 
- * http://www.helixcommunity.org/content/rpsl unless you have licensed 
- * the file under the current version of the RealNetworks Community 
- * Source License (the "RCSL") available at 
- * http://www.helixcommunity.org/content/rcsl, in which case the RCSL 
- * will apply. You may also obtain the license terms directly from 
- * RealNetworks.  You may not use this file except in compliance with 
- * the RPSL or, if you have a valid RCSL with RealNetworks applicable 
- * to this file, the RCSL.  Please see the applicable RPSL or RCSL for 
- * the rights, obligations and limitations governing use of the 
- * contents of the file. 
- *   
- * This file is part of the Helix DNA Technology. RealNetworks is the 
- * developer of the Original Code and owns the copyrights in the 
- * portions it created. 
- *   
- * This file, and the files included with this file, is distributed 
- * and made available on an 'AS IS' basis, WITHOUT WARRANTY OF ANY 
- * KIND, EITHER EXPRESS OR IMPLIED, AND REALNETWORKS HEREBY DISCLAIMS 
- * ALL SUCH WARRANTIES, INCLUDING WITHOUT LIMITATION, ANY WARRANTIES 
- * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, QUIET 
- * ENJOYMENT OR NON-INFRINGEMENT. 
- *  
- * Technology Compatibility Kit Test Suite(s) Location:  
- *    http://www.helixcommunity.org/content/tck  
- *  
- * Contributor(s):  
- *   
- * ***** END LICENSE BLOCK ***** */  
+/* ***** BEGIN LICENSE BLOCK *****
+ * Source last modified: $Id: trigtabs_fltgen.c,v 1.2 2006/12/05 03:36:53 ehyche Exp $
+ *
+ * Portions Copyright (c) 1995-2005 RealNetworks, Inc. All Rights Reserved.
+ *
+ * The contents of this file, and the files included with this file,
+ * are subject to the current version of the RealNetworks Public
+ * Source License (the "RPSL") available at
+ * http://www.helixcommunity.org/content/rpsl unless you have licensed
+ * the file under the current version of the RealNetworks Community
+ * Source License (the "RCSL") available at
+ * http://www.helixcommunity.org/content/rcsl, in which case the RCSL
+ * will apply. You may also obtain the license terms directly from
+ * RealNetworks.  You may not use this file except in compliance with
+ * the RPSL or, if you have a valid RCSL with RealNetworks applicable
+ * to this file, the RCSL.  Please see the applicable RPSL or RCSL for
+ * the rights, obligations and limitations governing use of the
+ * contents of the file.
+ *
+ * This file is part of the Helix DNA Technology. RealNetworks is the
+ * developer of the Original Code and owns the copyrights in the
+ * portions it created.
+ *
+ * This file, and the files included with this file, is distributed
+ * and made available on an 'AS IS' basis, WITHOUT WARRANTY OF ANY
+ * KIND, EITHER EXPRESS OR IMPLIED, AND REALNETWORKS HEREBY DISCLAIMS
+ * ALL SUCH WARRANTIES, INCLUDING WITHOUT LIMITATION, ANY WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, QUIET
+ * ENJOYMENT OR NON-INFRINGEMENT.
+ *
+ * Technology Compatibility Kit Test Suite(s) Location:
+ *    http://www.helixcommunity.org/content/tck
+ *
+ * Contributor(s):
+ *
+ * ***** END LICENSE BLOCK ***** */
 
 /**************************************************************************************
  * Fixed-point HE-AAC decoder
@@ -119,13 +119,13 @@ static void Init_cos4sin4tab(int *tPtr, int nmdct)
         x2 = invM *  sin(angle1);
         x3 = invM * (cos(angle2) + sin(angle2));
         x4 = invM *  sin(angle2);
-        
+
 		tPtr[0] = NormAndRound(x1, M2_30, nmdct);
 		tPtr[1] = NormAndRound(x2, M2_30, nmdct);
 		tPtr[2] = NormAndRound(x3, M2_30, nmdct);
 		tPtr[3] = NormAndRound(x4, M2_30, nmdct);
 		tPtr += 4;
-    }    
+    }
 }
 
 static void Init_cos1sin1tab(int *tPtr)
@@ -133,7 +133,7 @@ static void Init_cos1sin1tab(int *tPtr)
 	int i;
 	double angle, x1, x2;
 
-    for (i = 0; i <= (512/2); i++) {    
+    for (i = 0; i <= (512/2); i++) {
         angle = i * M_PI / 1024;
         x1 = (cos(angle) + sin(angle));
         x2 =  sin(angle);
@@ -234,14 +234,14 @@ static void Init_kbdWindow(int *tPtr, int nmdct)
 	}
 
 	/* symmetry:
-	 *  kbd_right(n) = kbd_ldef(N_REF - 1 - n), n = [N_REF/2, N_REF - 1] 
+	 *  kbd_right(n) = kbd_ldef(N_REF - 1 - n), n = [N_REF/2, N_REF - 1]
 	 *
 	 * 	wCurr = 0;
 	 * 	for (n = N_REF-1; n >= N_REF/2; n--) {
 	 * 		wCurr += CalcW(N_REF-n-1, a);
 	 * 		kbdWindowRef[n] = sqrt(wCurr / wBase);
 	 * 	}
-	 * 
+	 *
 	 */
 	return;
 }
@@ -257,17 +257,17 @@ static void Init_twidTabs(int *tPtrEven, int *tPtrOdd, int nfft)
             wi1 = sin(1.0 * M_PI * j / (2*k));
             wr1 = (wr1 + wi1);
             wi1 = -wi1;
- 
+
             wr2 = cos(2.0 * M_PI * j / (2*k));
             wi2 = sin(2.0 * M_PI * j / (2*k));
             wr2 = (wr2 + wi2);
             wi2 = -wi2;
- 
+
             wr3 = cos(3.0 * M_PI * j / (2*k));
             wi3 = sin(3.0 * M_PI * j / (2*k));
             wr3 = (wr3 + wi3);
             wi3 = -wi3;
- 
+
             if (k & 0xaaaaaaaa) {
                 tPtrOdd[0] = NormAndRound(wr2, M2_30, 1);
                 tPtrOdd[1] = NormAndRound(wi2, M2_30, 1);
@@ -292,7 +292,7 @@ static void Init_twidTabs(int *tPtrEven, int *tPtrOdd, int nfft)
 /**************************************************************************************
  * Function:    AACInitTrigtabsFloat
  *
- * Description: generate AAC decoder tables using floating-point math library 
+ * Description: generate AAC decoder tables using floating-point math library
  *
  * Inputs:      none
  *
@@ -300,7 +300,7 @@ static void Init_twidTabs(int *tPtrEven, int *tPtrOdd, int nfft)
  *
  * Return:      0 on success
  *
- * Notes:       this function should ONLY be called when double-precision 
+ * Notes:       this function should ONLY be called when double-precision
  *              floating-point math is supported
  *              the generated tables must be bit-exact matches with read-only
  *              tables stored in trigtabs.c
@@ -345,7 +345,7 @@ int AACInitTrigtabsFloat(void)
  * Return:      none
  **************************************************************************************/
 void AACFreeTrigtabsFloat(void)
-{	
+{
 	return;
 }
 

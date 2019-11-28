@@ -81,7 +81,7 @@ void aac_stop()
 }
 
 void aac_reset()
-{    
+{
     aac_stop();
     sDecStarted = false;
     sDecBlocksAvailable = false;
@@ -153,7 +153,7 @@ void aac_decode(u8* data, int length)
     while(length > 0 && sAACInitialized)
     {
         int err = 0;
-        if((err = AACDecode(sAACDecoder, &data, &length, &aac_audioBuffer[sNextAudioBlock * AUDIO_BLOCK_SIZE])) < 0) 
+        if((err = AACDecode(sAACDecoder, &data, &length, &aac_audioBuffer[sNextAudioBlock * AUDIO_BLOCK_SIZE])) < 0)
         {
             while(1);
             break;
