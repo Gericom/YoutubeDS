@@ -161,9 +161,7 @@ void showDirectoryContents(const std::vector<DirEntry>& dirContents, const std::
 }
 
 std::string browseForFile(const std::vector<std::string>& extensionList) {
-	videoSetModeSub(MODE_5_2D | DISPLAY_BG3_ACTIVE);
 	vramSetBankC(VRAM_C_SUB_BG);
-	bgInitSub(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
 
 	int pressed = 0, held = 0, screenOffset = 0, fileOffset = 0;
 	touchPosition touch;
