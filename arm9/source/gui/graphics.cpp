@@ -6,8 +6,8 @@
 #include "font_nftr.h"
 #include "fileBrowseBg.h"
 
-std::vector<u8> fontTiles;
-std::vector<u8> fontWidths;
+u8 *fontTiles;
+const u8 *fontWidths;
 std::vector<u16> fontMap;
 u16 tileSize, tileWidth, tileHeight;
 
@@ -22,16 +22,21 @@ void loadPalettes(void) {
 }
 
 void loadFont(void) {
-	// Load font info
-	u32 chunkSize = *(u32*)(font_nftr+0x30);
-	tileWidth = *(font_nftr+0x34);
-	tileHeight = *(font_nftr+0x35);
-	tileSize = *(u16*)(font_nftr+0x36);
+	// consoleDemoInit();
+	// Get glyph start
+	u8 glyphOfs = font_nftr[0x14] + 0x14;
+
+	// Load glyph info
+	u32 chunkSize = *(u32*)(font_nftr+glyphOfs);
+	tileWidth = font_nftr[glyphOfs+4];
+	tileHeight = font_nftr[glyphOfs+5];
+	tileSize = *(u16*)(font_nftr+glyphOfs+6);
+	// printf("%d\n%d\n%d\n", tileWidth, tileHeight, tileSize);
+	// while(1)swiWaitForVBlank();
 
 	// Load character glyphs
 	int tileAmount = ((chunkSize-0x10)/tileSize);
-	fontTiles = std::vector<u8>(tileSize*tileAmount);
-	memcpy(fontTiles.data(), font_nftr+0x3C, tileSize*tileAmount);
+	fontTiles = (u8*)font_nftr+glyphOfs+0xC;
 
 	// Fix top rows
 	for(int i=0;i<tileAmount;i++) {
@@ -43,8 +48,7 @@ void loadFont(void) {
 	// Load character widths
 	u32 locHDWC = *(u32*)(font_nftr+0x24);
 	chunkSize = *(u32*)(font_nftr+locHDWC-4);
-	fontWidths = std::vector<u8>(3*tileAmount);
-	memcpy(fontWidths.data(), font_nftr+locHDWC+8, 3*tileAmount);
+	fontWidths = font_nftr+locHDWC+8;
 
 	// Load character maps
 	fontMap = std::vector<u16>(tileAmount);
@@ -193,7 +197,7 @@ void printText(std::string text, double scaleX, double scaleY, int palette, int 
 void printText(std::u16string text, double scaleX, double scaleY, int palette, int xPos, int yPos) {
 	int x=xPos;
 	for(unsigned c=0;c<text.size();c++) {
-		if(text[c] == 0x00BB) { // » makes a new line currently, may change this
+		if(text[c] == '\n') {
 			x = xPos;
 			yPos += tileHeight;
 			continue;
