@@ -6,32 +6,37 @@
 #include "font_nftr.h"
 #include "fileBrowseBg.h"
 
-std::vector<u8> fontTiles;
-std::vector<u8> fontWidths;
+u8 *fontTiles;
+const u8 *fontWidths;
 std::vector<u16> fontMap;
 u16 tileSize, tileWidth, tileHeight;
 
 void loadPalettes(void) {
-	u16 palette[] = {0, 0xFBDE, 0xBDEF, // Light
-					 0, 0xD294, 0xA529, // Darker
-					 0, (u16)(palettes[PersonalData->theme][0] & 0xFBDE), (u16)(palettes[PersonalData->theme][0] & 0xBDEF), // Light colored
-					 0, (u16)(palettes[PersonalData->theme][0] & 0xD294), (u16)(palettes[PersonalData->theme][0] & 0xA529)}; // Darker colored
+	u16 palette[] = {0x0000, 0xFFFF, 0xD6B5, 0xB9CE, // White
+					 0x0000, 0xDEF7, 0xC631, 0xA94A, // Black
+					 0x0000, (u16)(palettes[PersonalData->theme][1] & 0xFFFF), (u16)(palettes[PersonalData->theme][1] & 0xDEF7), (u16)(palettes[PersonalData->theme][1] & 0xCE73), // Light colored
+					 0x0000, (u16)(palettes[PersonalData->theme][1] & 0xD6B5), (u16)(palettes[PersonalData->theme][1] & 0xCA52), (u16)(palettes[PersonalData->theme][1] & 0xC210)}; // Darker colored
 	tonccpy(BG_PALETTE_SUB, &palette, sizeof(palette));
 	tonccpy(BG_PALETTE_SUB+0x10, &fileBrowseBgPal, fileBrowseBgPalLen/2);
 	tonccpy(BG_PALETTE_SUB+0x13, &palettes[PersonalData->theme], sizeof(palettes[PersonalData->theme]));
 }
 
 void loadFont(void) {
-	// Load font info
-	u32 chunkSize = *(u32*)(font_nftr+0x30);
-	tileWidth = *(font_nftr+0x34);
-	tileHeight = *(font_nftr+0x35);
-	tileSize = *(u16*)(font_nftr+0x36);
+	// consoleDemoInit();
+	// Get glyph start
+	u8 glyphOfs = font_nftr[0x14] + 0x14;
+
+	// Load glyph info
+	u32 chunkSize = *(u32*)(font_nftr+glyphOfs);
+	tileWidth = font_nftr[glyphOfs+4];
+	tileHeight = font_nftr[glyphOfs+5];
+	tileSize = *(u16*)(font_nftr+glyphOfs+6);
+	// printf("%d\n%d\n%d\n", tileWidth, tileHeight, tileSize);
+	// while(1)swiWaitForVBlank();
 
 	// Load character glyphs
 	int tileAmount = ((chunkSize-0x10)/tileSize);
-	fontTiles = std::vector<u8>(tileSize*tileAmount);
-	memcpy(fontTiles.data(), font_nftr+0x3C, tileSize*tileAmount);
+	fontTiles = (u8*)font_nftr+glyphOfs+0xC;
 
 	// Fix top rows
 	for(int i=0;i<tileAmount;i++) {
@@ -43,8 +48,7 @@ void loadFont(void) {
 	// Load character widths
 	u32 locHDWC = *(u32*)(font_nftr+0x24);
 	chunkSize = *(u32*)(font_nftr+locHDWC-4);
-	fontWidths = std::vector<u8>(3*tileAmount);
-	memcpy(fontWidths.data(), font_nftr+locHDWC+8, 3*tileAmount);
+	fontWidths = font_nftr+locHDWC+8;
 
 	// Load character maps
 	fontMap = std::vector<u16>(tileAmount);
@@ -193,7 +197,7 @@ void printText(std::string text, double scaleX, double scaleY, int palette, int 
 void printText(std::u16string text, double scaleX, double scaleY, int palette, int xPos, int yPos) {
 	int x=xPos;
 	for(unsigned c=0;c<text.size();c++) {
-		if(text[c] == 0x00BB) { // » makes a new line currently, may change this
+		if(text[c] == '\n') {
 			x = xPos;
 			yPos += tileHeight;
 			continue;
@@ -202,10 +206,10 @@ void printText(std::u16string text, double scaleX, double scaleY, int palette, i
 		int t = getCharIndex(text[c]);
 		unsigned char image[tileSize * 4];
 		for(int i=0;i<tileSize;i++) {
-			image[(i*4)]   = (palette*3 + (fontTiles[i+(t*tileSize)]>>6 & 3));
-			image[(i*4)+1] = (palette*3 + (fontTiles[i+(t*tileSize)]>>4 & 3));
-			image[(i*4)+2] = (palette*3 + (fontTiles[i+(t*tileSize)]>>2 & 3));
-			image[(i*4)+3] = (palette*3 + (fontTiles[i+(t*tileSize)]    & 3));
+			image[(i*4)]   = (palette*4 + (fontTiles[i+(t*tileSize)]>>6 & 3));
+			image[(i*4)+1] = (palette*4 + (fontTiles[i+(t*tileSize)]>>4 & 3));
+			image[(i*4)+2] = (palette*4 + (fontTiles[i+(t*tileSize)]>>2 & 3));
+			image[(i*4)+3] = (palette*4 + (fontTiles[i+(t*tileSize)]    & 3));
 		}
 
 		x += fontWidths[t*3];

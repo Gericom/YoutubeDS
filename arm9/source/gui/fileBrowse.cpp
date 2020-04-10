@@ -126,7 +126,7 @@ void showDirectoryContents(const std::vector<DirEntry>& dirContents, const std::
 
 	// Print path
 	drawImageSection(0, 0, 256, 17, fileBrowseBgBitmap, 256, 0, 0, 16);
-	printTextMaxW(path, 250, 1, 0, 3, 0);
+	printTextMaxW(path, 250, 1, 0, 3, 1);
 
 	// Print directory listing
 	for(int i=0;i < ENTRIES_PER_SCREEN; i++) {
@@ -155,15 +155,13 @@ void showDirectoryContents(const std::vector<DirEntry>& dirContents, const std::
 				}
 			}
 
-			printText(name, 1, 1, !(startRow+i == selection) + (watched*2), 3, i*16+16);
+			printText(name, 1, 1, !(startRow+i == selection) + (watched*2), 3, i * 16 + 17);
 		}
 	}
 }
 
 std::string browseForFile(const std::vector<std::string>& extensionList) {
-	videoSetModeSub(MODE_5_2D | DISPLAY_BG3_ACTIVE);
 	vramSetBankC(VRAM_C_SUB_BG);
-	bgInitSub(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
 
 	int pressed = 0, held = 0, screenOffset = 0, fileOffset = 0;
 	touchPosition touch;
@@ -238,7 +236,7 @@ std::string browseForFile(const std::vector<std::string>& extensionList) {
 			touchRead(&touch);
 			for(int i=0;i<std::min(ENTRIES_PER_SCREEN, (int)dirContents.size());i++) {
 				if(touch.py > (i+1)*16 && touch.py < (i+2)*16) {
-					fileOffset = i;
+					fileOffset = screenOffset + i;
 					goto selection;
 				}
 			}
