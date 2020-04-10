@@ -192,7 +192,7 @@ ITCM_CODE void PlayVideo(const char *fileName)
 	drawRectangle(0, 0, 256, 192, 0);
 
 	// Draw progress bar background
-	drawRectangle(35, 6, 185, 7, 5);
+	drawRectangle(36, 5, 184, 7, 7);
 
 	printf("Opened file: %p\n", video);
 	//find the moov atom
@@ -648,10 +648,10 @@ ITCM_CODE void VBlankProc()
 				nrFramesInQueue--;
 			} else {
 				// Update time & progress if not copying a frame
-				drawRectangle(36, 7, (int)(((float)frame/nrframes)*184), 5, 4);
+				drawRectangle(37, 6, (int)(((float)frame/nrframes)*183), 5, 5);
 				char time[14];
 				snprintf(time, sizeof(time), "%.02d:%.02d", frame/(mTimeScale/1000)/60, (frame/(mTimeScale/1000))-((frame/(mTimeScale/1000)/60)*60));
-				drawRectangle(3, 1, 30, 16, 0);
+				drawRectangle(3, 1, 32, 16, 0);
 				printText(time, 1, 1, 1, 3, 1);
 			}
 		}
@@ -673,13 +673,13 @@ ITCM_CODE void VBlankProc()
 		} else if(held & KEY_LEFT) {
 			skip = -24*5;
 			drawBar:
-			drawRectangle(35, 6, 185, 7, 5);
-			drawRectangle(36, 7, (int)(((float)frame/nrframes)*184), 5, 4);
+			drawRectangle(36, 5, 184, 7, 7);
+			drawRectangle(37, 6, (int)(((float)frame/nrframes)*183), 5, 5);
 		} else if(held & KEY_TOUCH) {
 			touchPosition touch;
 			touchRead(&touch);
-			if(touch.py < 16 && touch.px > 35 && touch.px < 220) {
-				int newpos = nrframes*((float)(touch.px-35)/183);
+			if(touch.py < 16 && touch.px > 36 && touch.px < 220) {
+				int newpos = nrframes*((float)(touch.px-37)/182);
 				skip = newpos-frame;
 				goto drawBar; // overflowed itcm with it copied
 			}

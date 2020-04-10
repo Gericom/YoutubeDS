@@ -12,10 +12,10 @@ std::vector<u16> fontMap;
 u16 tileSize, tileWidth, tileHeight;
 
 void loadPalettes(void) {
-	u16 palette[] = {0, 0xFBDE, 0xBDEF, // Light
-					 0, 0xD294, 0xA529, // Darker
-					 0, (u16)(palettes[PersonalData->theme][0] & 0xFBDE), (u16)(palettes[PersonalData->theme][0] & 0xBDEF), // Light colored
-					 0, (u16)(palettes[PersonalData->theme][0] & 0xD294), (u16)(palettes[PersonalData->theme][0] & 0xA529)}; // Darker colored
+	u16 palette[] = {0x0000, 0xFFFF, 0xD6B5, 0xB9CE, // White
+					 0x0000, 0xDEF7, 0xC631, 0xA94A, // Black
+					 0x0000, (u16)(palettes[PersonalData->theme][1] & 0xFFFF), (u16)(palettes[PersonalData->theme][1] & 0xDEF7), (u16)(palettes[PersonalData->theme][1] & 0xCE73), // Light colored
+					 0x0000, (u16)(palettes[PersonalData->theme][1] & 0xD6B5), (u16)(palettes[PersonalData->theme][1] & 0xCA52), (u16)(palettes[PersonalData->theme][1] & 0xC210)}; // Darker colored
 	tonccpy(BG_PALETTE_SUB, &palette, sizeof(palette));
 	tonccpy(BG_PALETTE_SUB+0x10, &fileBrowseBgPal, fileBrowseBgPalLen/2);
 	tonccpy(BG_PALETTE_SUB+0x13, &palettes[PersonalData->theme], sizeof(palettes[PersonalData->theme]));
@@ -206,10 +206,10 @@ void printText(std::u16string text, double scaleX, double scaleY, int palette, i
 		int t = getCharIndex(text[c]);
 		unsigned char image[tileSize * 4];
 		for(int i=0;i<tileSize;i++) {
-			image[(i*4)]   = (palette*3 + (fontTiles[i+(t*tileSize)]>>6 & 3));
-			image[(i*4)+1] = (palette*3 + (fontTiles[i+(t*tileSize)]>>4 & 3));
-			image[(i*4)+2] = (palette*3 + (fontTiles[i+(t*tileSize)]>>2 & 3));
-			image[(i*4)+3] = (palette*3 + (fontTiles[i+(t*tileSize)]    & 3));
+			image[(i*4)]   = (palette*4 + (fontTiles[i+(t*tileSize)]>>6 & 3));
+			image[(i*4)+1] = (palette*4 + (fontTiles[i+(t*tileSize)]>>4 & 3));
+			image[(i*4)+2] = (palette*4 + (fontTiles[i+(t*tileSize)]>>2 & 3));
+			image[(i*4)+3] = (palette*4 + (fontTiles[i+(t*tileSize)]    & 3));
 		}
 
 		x += fontWidths[t*3];
